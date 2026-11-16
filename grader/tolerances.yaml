@@ -1,0 +1,3 @@
+# Placeholder. The rubric (grader/rubric.py) is user-authored; this file
+# should hold every weight and tolerance it uses, each with a one-line
+# comment explaining the choice (per the eval brief). Empty until then.

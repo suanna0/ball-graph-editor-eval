@@ -1,0 +1,34 @@
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+#stage {
+  position: relative;
+  width: 960px;
+  height: 540px;
+  overflow: hidden;
+  background: #eef2f7;
+}
+
+#floor {
+  position: absolute;
+  left: 0;
+  top: 460px;
+  width: 100%;
+  height: 2px;
+  background: #333;
+}
+
+#ball {
+  position: absolute;
+  width: 48px;
+  height: 48px;
+  margin-left: -24px; /* so translate(x, y) positions the CENTER at (x, y) */
+  margin-top: -24px;
+  border-radius: 50%;
+  background: #555;
+  left: 0;
+  top: 0;
+  transform: translate(80px, 140px); /* starting center: (80, 460-320) */
+}
+
+/* Add your @keyframes rule here, and apply it to #ball below, e.g.:
+   #ball { animation: bounce 6s 1 forwards; } */

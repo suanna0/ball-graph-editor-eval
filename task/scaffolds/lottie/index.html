@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Ball bounce</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    #stage { position: relative; width: 960px; height: 540px; overflow: hidden; background: #eef2f7; }
+    #floor { position: absolute; left: 0; top: 460px; width: 100%; height: 2px; background: #333; }
+    #player { position: absolute; left: 0; top: 0; width: 960px; height: 540px; }
+  </style>
+</head>
+<body>
+  <div id="stage">
+    <div id="floor"></div>
+    <div id="player"></div>
+  </div>
+  <!-- Pinned CDN build. Do not change the player setup below. -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/bodymovin/5.12.2/lottie.min.js"></script>
+  <script>
+    lottie.loadAnimation({
+      container: document.getElementById("player"),
+      renderer: "svg",
+      loop: false,
+      autoplay: true,
+      path: "animation.json",
+    });
+  </script>
+</body>
+</html>

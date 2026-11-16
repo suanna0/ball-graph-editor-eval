@@ -1,0 +1,26 @@
+# Runner config: WHO runs the grid and WHICH SLICE of it. Kept separate
+# from task/task.yaml so the task itself stays model-agnostic.
+
+worker:
+  provider: anthropic
+  models:
+    - claude-sonnet-5
+
+  thinking:
+    type: enabled
+    budget_tokens: 2048
+
+  max_tokens: 8192
+
+# Which slice of task.yaml's frameworks/materials/feedback_modes to run,
+# and how many repeats (seeds) per cell. Must be subsets of task.yaml.
+grid:
+  frameworks: [css]
+  materials: [bowling_ball]
+  feedback_modes: [blind]
+  seeds: 1
+
+batch:
+  concurrency: 1
+
+output_dir: ./runs

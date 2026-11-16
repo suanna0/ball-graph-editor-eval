@@ -1,0 +1,61 @@
+# Ball Bounce Eval task definition. Model-agnostic: nothing here names a
+# worker model. Model choice and the slice of this grid to actually run
+# live in runner.yaml.
+
+name: ball-bounce
+version: 1
+
+# Fixed across every rollout, in every framework and material. Coordinates
+# are standard DOM/CSS: x increases rightward, y increases downward, origin
+# at the viewport's top-left. All of this is told to the worker in the
+# brief (it is the task spec, not the rubric).
+physical:
+  viewport: { width: 960, height: 540 }
+  ball_diameter_px: 48
+  floor_y_px: 460          # y of the ball's CENTER when resting on the floor
+  start:
+    x_px: 80               # ball's starting center x
+    height_px: 320         # ball starts this many px ABOVE the floor
+  window_seconds: 6        # the animation must come to rest within this window
+
+brief_template: ./brief.md.j2
+
+# Each framework ships a buildless starter (no bundler/browser needed in
+# the worker container) that the worker edits directly.
+frameworks:
+  css:
+    scaffold: ./scaffolds/css
+    buildless: true
+  gsap:
+    scaffold: ./scaffolds/gsap
+    buildless: true
+  lottie:
+    scaffold: ./scaffolds/lottie
+    buildless: true
+
+materials:
+  - bowling_ball
+  - beach_ball
+  - ping_pong_ball
+
+# What tools the worker has, per feedback condition. render_graph renders
+# ONLY a plot of the current keyframes/handles -- never the animation
+# itself, and never anything the grader later trusts (see runtime/tools.py).
+feedback_modes:
+  blind:
+    tools: [read_file, write_file, list_dir, bash, finish]
+  can_render_and_view_graph:
+    tools: [read_file, write_file, list_dir, bash, render_graph, finish]
+
+# Per-rollout limits. Uniform across models and frameworks.
+limits:
+  wall_clock_seconds: 1800
+  max_turns: 60
+  max_output_tokens: 128000
+  max_tool_calls: 200
+
+# Host-only. Never copied into the worker's container or exposed through
+# any worker tool. Extraction always re-derives curves from the frozen
+# final/ snapshot, run from the repo root.
+grader:
+  extractor_cmd: ["npx", "tsx", "extractor/src/extract.ts"]

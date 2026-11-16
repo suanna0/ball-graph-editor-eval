@@ -1,0 +1,55 @@
+You're building a short animation of a {{ material_label }} bouncing across
+the screen, in {{ framework }}.
+
+## Scene
+
+- Viewport: {{ viewport.width }}x{{ viewport.height }}px.
+- Side view. The ball travels left to right while it bounces.
+- The ball is a circle, {{ ball_diameter_px }}px in diameter.
+- Coordinates: x increases rightward, y increases downward, origin at the
+  viewport's top-left corner (standard screen/CSS coordinates).
+- The floor is the horizontal line at y = {{ floor_y_px }}px. When the ball
+  rests on the floor, its CENTER is at y = {{ floor_y_px }}.
+- The ball starts at x = {{ start_x_px }}px, {{ start_height_px }}px above
+  the floor (center y = {{ floor_y_px - start_height_px }}).
+- The whole animation must finish -- the ball must come to rest on the
+  floor -- within {{ window_seconds }} seconds.
+
+## Material
+
+The ball is a {{ material_label }}. Make the bounce behavior and look
+believable for that material.
+
+## Constraints
+
+- Author the motion with keyframes and easing/Bezier curves. Do not write a
+  physics simulation loop (no per-frame velocity/gravity integration in
+  JavaScript). The animation must be fully described by the keyframes and
+  their easing, exactly as {{ framework }} normally expresses motion.
+- The starting source files are already in this directory. Edit them
+  directly; do not restructure the project layout.
+{%- if framework == "css" %}
+- Edit `style.css`. Use a `@keyframes` rule on `#ball`, driven by its
+  `transform` (`translate`, `scale`, `rotate`) and `animation-timing-function`.
+{%- elif framework == "gsap" %}
+- Edit `animation.js`. Use GSAP (`gsap.to` / `gsap.timeline`) to animate
+  `#ball`'s position, scale and rotation. GSAP is already loaded globally
+  via the `<script>` tag in `index.html` -- do not replace it with a bundled
+  import.
+{%- elif framework == "lottie" %}
+- Edit `animation.json` directly (standard Lottie/Bodymovin format). The
+  ball is the shape layer named `ball`; animate its transform (`ks.p`,
+  `ks.s`, `ks.r`) with keyframed values and bezier easing (`i`/`o`).
+  `index.html` already loads it with lottie-web; do not change the player
+  setup.
+{%- endif %}
+- When you believe the animation is complete and matches the scene above,
+  call `finish`.
+
+## Tools
+
+You have `read_file`, `write_file`, `list_dir`, `bash`, and `finish`.
+{%- if has_render_graph %}
+You also have `render_graph`, which renders your current keyframes and
+Bezier handles as a graph-editor style plot so you can inspect your curves.
+{%- endif %}

@@ -1,0 +1,19 @@
+<!doctype html>
+<html>
+<head>
+<style>
+#ball {
+  position: absolute;
+  width: 48px; height: 48px;
+  transform: translate(80px, 140px);
+  animation: bounce 2s 1 forwards;
+}
+@keyframes bounce {
+  0%   { transform: translate(80px, 140px) scale(1,1) rotate(0deg); animation-timing-function: cubic-bezier(0.33,0,0.67,0.33); }
+  50%  { transform: translate(480px, 320px) scale(1,0.7) rotate(90deg); animation-timing-function: cubic-bezier(0.33,0.67,0.67,1); }
+  100% { transform: translate(880px, 140px) scale(1,1) rotate(180deg); }
+}
+</style>
+</head>
+<body><div id="ball"></div></body>
+</html>
