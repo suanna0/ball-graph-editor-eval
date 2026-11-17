@@ -33,6 +33,7 @@ def run_agent(
     model: str,
     max_tokens: int,
     thinking: dict | None,
+    output_config: dict | None,
     prompt_text: str,
     tool_specs: list[dict],
     tool_bridge,
@@ -72,6 +73,8 @@ def run_agent(
         }
         if thinking:
             req["thinking"] = thinking
+        if output_config:
+            req["output_config"] = output_config
 
         event_log.log("model_request", turn=turns)
         resp = client.messages.create(**req)

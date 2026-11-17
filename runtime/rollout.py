@@ -94,6 +94,7 @@ def run_one_rollout(
             model=cell.model,
             max_tokens=runner_cfg.max_tokens,
             thinking=runner_cfg.thinking,
+            output_config=runner_cfg.output_config,
             prompt_text=prompt_text,
             tool_specs=tool_specs(feedback_spec.tools),
             tool_bridge=bridge,

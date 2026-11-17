@@ -6,9 +6,20 @@ worker:
   models:
     - claude-sonnet-5
 
+  # Sonnet 5 removed the fixed thinking budget: {type: enabled, budget_tokens: N}
+  # returns a 400. Adaptive is the only on-mode -- Claude decides how much to
+  # think per turn. Depth would be tuned with output_config.effort (default
+  # "high"), which runtime/agent.py does not pass through yet.
   thinking:
-    type: enabled
-    budget_tokens: 2048
+    type: adaptive
+
+  # Pinned rather than left to the API default (currently "high"). Effort
+  # changes how hard the worker thinks, so it is an experimental variable:
+  # leaving it implicit would let a future default change silently shift
+  # scores. Each run freezes this file, so every record states its effort.
+  # Levels: low | medium | high | xhigh | max.
+  output_config:
+    effort: high
 
   max_tokens: 8192
 

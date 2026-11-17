@@ -96,6 +96,7 @@ class RunnerSpec:
     provider: str
     models: list[str]
     thinking: dict | None
+    output_config: dict | None
     max_tokens: int
     grid: GridSelection
     concurrency: int
@@ -114,6 +115,7 @@ def load_runner(runner_yaml: Path) -> RunnerSpec:
         provider=w["provider"],
         models=list(w["models"]),
         thinking=w.get("thinking"),
+        output_config=w.get("output_config"),
         max_tokens=w.get("max_tokens", 8192),
         grid=GridSelection(
             frameworks=list(g["frameworks"]),
