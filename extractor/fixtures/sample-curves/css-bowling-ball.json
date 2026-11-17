@@ -1,0 +1,309 @@
+{
+  "framework": "css",
+  "renderTarget": "dom",
+  "properties": {
+    "x": [
+      {
+        "time": 0,
+        "value": 80,
+        "inHandle": null,
+        "outHandle": {
+          "dt": 0.4399890000000001,
+          "dv": 0
+        },
+        "easeSource": "hand-placed",
+        "presetName": "cubic-bezier(0.55, 0, 1, 0.45)"
+      },
+      {
+        "time": 0.79998,
+        "value": 320,
+        "inHandle": {
+          "dt": 0,
+          "dv": -132
+        },
+        "outHandle": {
+          "dt": 0,
+          "dv": 66
+        },
+        "easeSource": "hand-placed",
+        "presetName": "cubic-bezier(0, 0.55, 0.45, 1)"
+      },
+      {
+        "time": 1.2000000000000002,
+        "value": 440,
+        "inHandle": {
+          "dt": -0.2200110000000001,
+          "dv": 0
+        },
+        "outHandle": {
+          "dt": 0.22001100000000004,
+          "dv": 0
+        },
+        "easeSource": "hand-placed",
+        "presetName": "cubic-bezier(0.55, 0, 1, 0.45)"
+      },
+      {
+        "time": 1.6000200000000002,
+        "value": 560,
+        "inHandle": {
+          "dt": 0,
+          "dv": -66
+        },
+        "outHandle": {
+          "dt": 0,
+          "dv": 33
+        },
+        "easeSource": "hand-placed",
+        "presetName": "cubic-bezier(0, 0.55, 0.45, 1)"
+      },
+      {
+        "time": 1.7999999999999998,
+        "value": 620,
+        "inHandle": {
+          "dt": -0.1099889999999998,
+          "dv": 0
+        },
+        "outHandle": {
+          "dt": 0.10998900000000003,
+          "dv": 0
+        },
+        "easeSource": "hand-placed",
+        "presetName": "cubic-bezier(0.55, 0, 1, 0.45)"
+      },
+      {
+        "time": 1.9999799999999999,
+        "value": 680,
+        "inHandle": {
+          "dt": 0,
+          "dv": -33
+        },
+        "outHandle": {
+          "dt": 0,
+          "dv": 16.5
+        },
+        "easeSource": "hand-placed",
+        "presetName": "cubic-bezier(0, 0.55, 0.45, 1)"
+      },
+      {
+        "time": 2.0999999999999996,
+        "value": 710,
+        "inHandle": {
+          "dt": -0.05501099999999988,
+          "dv": 0
+        },
+        "outHandle": {
+          "dt": 0.05501100000000012,
+          "dv": 0
+        },
+        "easeSource": "hand-placed",
+        "presetName": "cubic-bezier(0.55, 0, 1, 0.45)"
+      },
+      {
+        "time": 2.20002,
+        "value": 740,
+        "inHandle": {
+          "dt": 0,
+          "dv": -16.5
+        },
+        "outHandle": {
+          "dt": 0,
+          "dv": 8.25
+        },
+        "easeSource": "hand-placed",
+        "presetName": "cubic-bezier(0, 0.55, 0.45, 1)"
+      },
+      {
+        "time": 2.25,
+        "value": 755,
+        "inHandle": {
+          "dt": -0.027489000000000076,
+          "dv": 0
+        },
+        "outHandle": {
+          "dt": 0.027489000000000076,
+          "dv": 0
+        },
+        "easeSource": "hand-placed",
+        "presetName": "cubic-bezier(0.55, 0, 1, 0.45)"
+      },
+      {
+        "time": 2.29998,
+        "value": 770,
+        "inHandle": {
+          "dt": 0,
+          "dv": -8.25
+        },
+        "outHandle": {
+          "dt": 1.2210066,
+          "dv": 130
+        },
+        "easeSource": "hand-placed",
+        "presetName": "cubic-bezier(0.33, 1, 0.68, 1)"
+      },
+      {
+        "time": 6,
+        "value": 900,
+        "inHandle": {
+          "dt": -1.1840063999999997,
+          "dv": 0
+        },
+        "outHandle": null,
+        "easeSource": "linear"
+      }
+    ],
+    "y": [
+      {
+        "time": 0,
+        "value": 140,
+        "inHandle": null,
+        "outHandle": {
+          "dt": 0.4399890000000001,
+          "dv": 0
+        },
+        "easeSource": "hand-placed",
+        "presetName": "cubic-bezier(0.55, 0, 1, 0.45)"
+      },
+      {
+        "time": 0.79998,
+        "value": 460,
+        "inHandle": {
+          "dt": 0,
+          "dv": -176
+        },
+        "outHandle": {
+          "dt": 0,
+          "dv": -44
+        },
+        "easeSource": "hand-placed",
+        "presetName": "cubic-bezier(0, 0.55, 0.45, 1)"
+      },
+      {
+        "time": 1.2000000000000002,
+        "value": 380,
+        "inHandle": {
+          "dt": -0.2200110000000001,
+          "dv": 0
+        },
+        "outHandle": {
+          "dt": 0.22001100000000004,
+          "dv": 0
+        },
+        "easeSource": "hand-placed",
+        "presetName": "cubic-bezier(0.55, 0, 1, 0.45)"
+      },
+      {
+        "time": 1.6000200000000002,
+        "value": 460,
+        "inHandle": {
+          "dt": 0,
+          "dv": -44
+        },
+        "outHandle": {
+          "dt": 0,
+          "dv": -11
+        },
+        "easeSource": "hand-placed",
+        "presetName": "cubic-bezier(0, 0.55, 0.45, 1)"
+      },
+      {
+        "time": 1.7999999999999998,
+        "value": 440,
+        "inHandle": {
+          "dt": -0.1099889999999998,
+          "dv": 0
+        },
+        "outHandle": {
+          "dt": 0.10998900000000003,
+          "dv": 0
+        },
+        "easeSource": "hand-placed",
+        "presetName": "cubic-bezier(0.55, 0, 1, 0.45)"
+      },
+      {
+        "time": 1.9999799999999999,
+        "value": 460,
+        "inHandle": {
+          "dt": 0,
+          "dv": -11
+        },
+        "outHandle": {
+          "dt": 0,
+          "dv": -2.75
+        },
+        "easeSource": "hand-placed",
+        "presetName": "cubic-bezier(0, 0.55, 0.45, 1)"
+      },
+      {
+        "time": 2.0999999999999996,
+        "value": 455,
+        "inHandle": {
+          "dt": -0.05501099999999988,
+          "dv": 0
+        },
+        "outHandle": {
+          "dt": 0.05501100000000012,
+          "dv": 0
+        },
+        "easeSource": "hand-placed",
+        "presetName": "cubic-bezier(0.55, 0, 1, 0.45)"
+      },
+      {
+        "time": 2.20002,
+        "value": 460,
+        "inHandle": {
+          "dt": 0,
+          "dv": -2.75
+        },
+        "outHandle": {
+          "dt": 0,
+          "dv": -0.6875
+        },
+        "easeSource": "hand-placed",
+        "presetName": "cubic-bezier(0, 0.55, 0.45, 1)"
+      },
+      {
+        "time": 2.25,
+        "value": 458.75,
+        "inHandle": {
+          "dt": -0.027489000000000076,
+          "dv": 0
+        },
+        "outHandle": {
+          "dt": 0.027489000000000076,
+          "dv": 0
+        },
+        "easeSource": "hand-placed",
+        "presetName": "cubic-bezier(0.55, 0, 1, 0.45)"
+      },
+      {
+        "time": 2.29998,
+        "value": 460,
+        "inHandle": {
+          "dt": 0,
+          "dv": -0.6875
+        },
+        "outHandle": {
+          "dt": 1.2210066,
+          "dv": 0
+        },
+        "easeSource": "hand-placed",
+        "presetName": "cubic-bezier(0.33, 1, 0.68, 1)"
+      },
+      {
+        "time": 6,
+        "value": 460,
+        "inHandle": {
+          "dt": -1.1840063999999997,
+          "dv": 0
+        },
+        "outHandle": null,
+        "easeSource": "linear"
+      }
+    ],
+    "scaleX": [],
+    "scaleY": [],
+    "rotation": []
+  },
+  "durationSeconds": 6,
+  "extractionWarnings": []
+}

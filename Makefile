@@ -5,7 +5,13 @@ export PATH := $(HOME)/.docker/bin:$(PATH)
 
 LIMIT ?=
 
-.PHONY: help build run-batch grade aggregate gallery test typecheck
+# `make viewer` renders the interactive viewer from any curves.json. It
+# defaults to a real extracted sample so the view can be worked on without
+# re-running a rollout. Output goes under runs/, which is gitignored.
+CURVES ?= extractor/fixtures/sample-curves/css-bowling-ball.json
+VIEWER_OUT ?= runs/viewer-sample.html
+
+.PHONY: help build run-batch grade aggregate gallery viewer test typecheck
 
 help:
 	@echo "Targets:"
@@ -15,6 +21,7 @@ help:
 	@echo "  make grade RUN=<run-dir>   Grade one rollout (extract + score). Add STUB=1 to use a stub rubric."
 	@echo "  make aggregate             Build the aggregate report over runs/."
 	@echo "  make gallery               Build runs/gallery.html."
+	@echo "  make viewer [CURVES=<f>]   Render the interactive viewer from a curves.json (defaults to the sample fixture)."
 	@echo "  make test                  Run the extractor (vitest) and rubric (pytest) test suites."
 	@echo "  make typecheck             Typecheck the TypeScript extractor."
 
@@ -39,6 +46,11 @@ aggregate:
 
 gallery:
 	python3 -m analysis.gallery
+
+viewer:
+	@mkdir -p $(dir $(VIEWER_OUT))
+	npx tsx extractor/src/render-viewer.ts $(CURVES) $(VIEWER_OUT)
+	@echo "wrote $(VIEWER_OUT)  (from $(CURVES))"
 
 test:
 	npx vitest run
