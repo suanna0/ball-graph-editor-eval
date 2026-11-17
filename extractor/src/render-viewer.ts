@@ -21,6 +21,16 @@ const VIEWPORT = { width: 960, height: 540 };
 const BALL_DIAMETER = 48;
 const FLOOR_Y = 460;
 
+// Inline SVG rather than text glyphs, so the shape does not depend on the
+// font having them. currentColor picks up the button's inherited ink.
+const ICON_PLAY =
+  '<svg viewBox="0 0 12 12" width="11" height="11" aria-hidden="true">' +
+  '<path d="M4.2 2.6 L9.4 6 L4.2 9.4 Z" fill="currentColor"/></svg>';
+const ICON_PAUSE =
+  '<svg viewBox="0 0 12 12" width="11" height="11" aria-hidden="true">' +
+  '<rect x="3.6" y="2.6" width="1.9" height="6.8" fill="currentColor"/>' +
+  '<rect x="6.5" y="2.6" width="1.9" height="6.8" fill="currentColor"/></svg>';
+
 /** Embeds JSON in a <script> safely: `<` is escaped so a string containing
  * "</script>" cannot terminate the tag early. */
 function embedJson(value: unknown): string {
@@ -29,89 +39,107 @@ function embedJson(value: unknown): string {
 
 export function renderViewerHtml(curves: CanonicalCurveSet): string {
   const title = `${curves.framework} rollout - curve viewer`;
+  // One card per channel that actually carries keys, so a stray channel
+  // shows up as an extra column instead of hiding inside a shared plot.
+  const activeProps = (["x", "y", "scaleX", "scaleY", "rotation"] as const)
+    .filter((prop) => (curves.properties[prop] ?? []).length > 0);
+  const graphPanes = activeProps
+    .map((prop) => `  <div class="pane">
+    <h2>${prop}</h2>
+    <div class="graph" data-prop="${prop}"></div>
+  </div>`)
+    .join("\n");
   return `<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>${title}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400&display=swap" />
 <style>
+  /* THREE COLORS. --ink carries every neutral -- text, curve, borders, the
+     floor line, panel fill -- at different alphas. --key marks keyframes,
+     and its handles, which belong to it. --playhead is the only other
+     hue. Nothing here may introduce a fourth: derive instead. */
   :root {
-    --bg: #ffffff; --panel: #f8f9fa; --border: #dddddd; --text: #222222;
-    --muted: #888888; --key: #2563eb; --handle: #f97316; --curve: #444444;
-    --playhead: #dc2626; --ball: #2563eb; --floor: #333333;
+    --ink: #1d2025;
+    --key: #2563eb;
+    --playhead: #dc2626;
+    --surface: #fff;
+    --panel: color-mix(in srgb, var(--ink) 4%, var(--surface));
+    --line: color-mix(in srgb, var(--ink) 16%, transparent);
+    --faint: color-mix(in srgb, var(--ink) 45%, transparent);
+    --select: color-mix(in srgb, var(--key) 18%, transparent);
+
+    /* ONE TYPE STYLE, set once on body. Everything inherits it, SVG text
+       included, so no other rule names a font. Hierarchy comes from color,
+       case and position -- never size or weight. */
+    --type: 400 12px/1.5 "Inter", ui-sans-serif, system-ui, sans-serif;
   }
-  * { box-sizing: border-box; }
-  body {
-    margin: 0; padding: 16px; background: var(--bg); color: var(--text);
-    font: 13px/1.5 ui-sans-serif, system-ui, sans-serif;
-  }
-  h1 { font-size: 15px; margin: 0 0 2px; font-weight: 600; }
-  .meta { color: var(--muted); font-size: 12px; margin-bottom: 14px; }
-  .meta code { font-size: 11px; }
-  .panes { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start; }
-  .pane { background: var(--panel); border: 1px solid var(--border); border-radius: 6px; padding: 12px; }
-  .pane h2 { font-size: 12px; margin: 0 0 8px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
-  #stage { position: relative; background: #fff; border: 1px solid var(--border); overflow: hidden; }
-  #ball { position: absolute; border-radius: 50%; background: var(--ball); will-change: transform; }
-  #floorLine { position: absolute; left: 0; width: 100%; height: 0; border-top: 2px solid var(--floor); }
+  * { box-sizing: border-box; letter-spacing: 0; }
+  /* Cards sit centred in the window. The "safe" keyword keeps the top
+     reachable if content ever outgrows the viewport, where plain centring
+     would clip it out of scroll range. (No backticks in here -- this CSS
+     lives inside a TS template literal and one would terminate it.) */
+  body { margin: 0; padding: 16px; min-height: 100vh; display: flex; flex-direction: column;
+         justify-content: center; justify-content: safe center;
+         font: var(--type); background: var(--surface); color: var(--ink); }
+  h2 { font: inherit; margin: 0; }
+  button, input { font: inherit; color: inherit; }
+
+  /* Equal columns across the full window. auto-fit rather than a fixed
+     count, because the cards come from whichever channels carry keys. */
+  .panes { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+           grid-auto-rows: 1fr; gap: 16px; }
+  .pane { display: flex; flex-direction: column; min-width: 0; padding: 8px;
+          background: var(--panel); border: 1px solid var(--line); border-radius: 6px; }
+  .pane h2 { margin-bottom: 6px; color: var(--faint); text-transform: uppercase; text-align: center; }
+
+  #stage { position: relative; width: 100%; overflow: hidden;
+           background: var(--surface); border: 1px solid var(--line); }
+  #ball { position: absolute; border-radius: 50%; background: var(--key); }
+  #floorLine { position: absolute; left: 0; width: 100%; border-top: 2px solid var(--faint); }
+
   .controls { display: flex; align-items: center; gap: 10px; margin-top: 12px; flex-wrap: wrap; }
-  button { font: inherit; padding: 4px 12px; border: 1px solid var(--border); background: #fff; border-radius: 4px; cursor: pointer; }
-  button:hover { background: #f0f0f0; }
-  #scrub { flex: 1; min-width: 220px; }
-  #readout { font-variant-numeric: tabular-nums; color: var(--muted); font-size: 12px; min-width: 190px; }
-  .warn { margin-top: 12px; padding: 8px 10px; border-left: 3px solid var(--handle); background: #fff7ed; font-size: 12px; }
-  .legend { margin-top: 10px; display: flex; gap: 14px; font-size: 11px; color: var(--muted); flex-wrap: wrap; }
-  .legend i { display: inline-block; width: 10px; height: 10px; vertical-align: -1px; margin-right: 4px; }
-  @media (prefers-color-scheme: dark) {
-    :root:not([data-theme="light"]) {
-      --bg: #16181c; --panel: #1e2126; --border: #343841; --text: #e6e8ea;
-      --muted: #9aa0a8; --curve: #c2c7cd; --floor: #8b919a;
-    }
-    :root:not([data-theme="light"]) #stage { background: #0f1115; }
-    :root:not([data-theme="light"]) button { background: #24282e; color: inherit; }
-    :root:not([data-theme="light"]) button:hover { background: #2d323a; }
-    :root:not([data-theme="light"]) .warn { background: #2a1f14; }
-  }
+  /* Circular, fixed size, so nothing shifts when the icon toggles. */
+  button { width: 28px; height: 28px; padding: 0; display: grid; place-items: center;
+           background: var(--surface); border: 1px solid var(--line);
+           border-radius: 50%; cursor: pointer; }
+  button:hover { background: var(--panel); }
+  #scrub { flex: 1; min-width: 220px; accent-color: var(--key); }
+
+  /* Plot absorbs the card, rather than sitting centred in spare room. */
+  .graph { flex: 1; min-width: 0; min-height: 0; }
+  .graph svg { display: block; }
+
+  .hint { margin: 10px 0 0; text-align: center; color: var(--faint); }
+  .warn { margin-top: 12px; padding: 8px 10px; background: var(--panel); border-left: 3px solid var(--playhead); }
 </style>
 </head>
 <body>
-<h1>${curves.framework} / ${curves.renderTarget}</h1>
-<div class="meta">
-  duration <code>${curves.durationSeconds.toFixed(3)}s</code> &middot;
-  reconstructed entirely from <code>curves.json</code>
-</div>
-
 <div class="panes">
   <div class="pane">
-    <h2>Reconstructed playback</h2>
+    <h2>viewport</h2>
     <div id="stage"></div>
     <div class="controls">
-      <button id="play">Play</button>
-      <button id="prevKey" title="Previous y keyframe">&#9664;&#9666; prev key</button>
-      <button id="nextKey" title="Next y keyframe">next key &#9656;&#9656;</button>
-    </div>
-    <div class="controls">
+      <button id="play" aria-label="play">${ICON_PLAY}</button>
       <input type="range" id="scrub" min="0" max="1" step="0.0005" value="0" />
     </div>
-    <div id="readout"></div>
   </div>
 
-  <div class="pane">
-    <h2>Graph editor</h2>
-    <div id="graph"></div>
-    <div class="legend">
-      <span><i style="background:var(--key)"></i>keyframe</span>
-      <span><i style="background:var(--handle)"></i>handle</span>
-      <span><i style="background:var(--curve)"></i>bezier curve</span>
-      <span><i style="background:var(--playhead)"></i>playhead</span>
-    </div>
-  </div>
+${graphPanes}
 </div>
+
+<p class="hint">drag across graph to zoom &middot; 'r' to reset zoom</p>
+
 
 <div id="warnings"></div>
 
 <script>
+const ICON_PLAY = ${embedJson(ICON_PLAY)};
+const ICON_PAUSE = ${embedJson(ICON_PAUSE)};
 const CURVES = ${embedJson(curves)};
 const VIEWPORT = ${embedJson(VIEWPORT)};
 const BALL_D = ${BALL_DIAMETER};
@@ -169,25 +197,43 @@ const ACTIVE = PROPS.filter((p) => (CURVES.properties[p] || []).length > 0);
 
 // ------------------------------------------------------------------- stage
 const stage = document.getElementById("stage");
-const SCALE = 0.5;
-stage.style.width = VIEWPORT.width * SCALE + "px";
-stage.style.height = VIEWPORT.height * SCALE + "px";
-
 const floorLine = document.createElement("div");
 floorLine.id = "floorLine";
-floorLine.style.top = FLOOR_Y * SCALE + "px";
 stage.appendChild(floorLine);
-
 const ball = document.createElement("div");
 ball.id = "ball";
-ball.style.width = BALL_D * SCALE + "px";
-ball.style.height = BALL_D * SCALE + "px";
 stage.appendChild(ball);
 
+// The stage spans its card, so the scale is whatever that width implies
+// rather than a constant. Height follows from the viewport aspect ratio.
+let SCALE = 0.4;
+function layoutStage() {
+  const w = stage.clientWidth;
+  if (!w) return;
+  SCALE = w / VIEWPORT.width;
+  stage.style.height = Math.round(VIEWPORT.height * SCALE) + "px";
+  floorLine.style.top = FLOOR_Y * SCALE + "px";
+  ball.style.width = BALL_D * SCALE + "px";
+  ball.style.height = BALL_D * SCALE + "px";
+}
+
 // --------------------------------------------------------------- graph plot
-const W = 576, LANE_H = 96, LANE_GAP = 10, ML = 90, MR = 16, MT = 10, MB = 26;
-const PLOT_W = W - ML - MR;
-const tToX = (t) => ML + (t / DURATION) * PLOT_W;
+// Each channel has its own card, so a plot holds exactly one lane: no lane
+// gap, and no in-SVG lane name because the card heading carries it. That
+// frees vertical room for the curve. The gutter only fits axis numbers.
+// Width is measured from the card at render time, not fixed, so graphs
+// fill whatever column width the grid gives them. Re-rendering at the
+// real pixel width (rather than scaling one SVG with a viewBox) keeps
+// label text at a true 11px instead of scaling it off the type ramp.
+const MIN_W = 280, MIN_H = 150, ML = 60, MR = 16, MT = 14, MB = 30;
+const plotW = (w) => Math.max(w - ML - MR, 40);
+// The visible time window. Brushing a range on any graph narrows it for
+// ALL graphs, so the cards always share one time axis.
+let viewT0 = 0, viewT1 = DURATION;
+const viewSpan = () => Math.max(viewT1 - viewT0, 1e-6);
+const isZoomed = () => viewT0 > 0 || viewT1 < DURATION;
+const tToXw = (t, w) => ML + ((t - viewT0) / viewSpan()) * plotW(w);
+const xToTw = (x, w) => viewT0 + ((x - ML) / plotW(w)) * viewSpan();
 
 /** Extracted y is screen space (down-positive), so plotting it raw puts
  * contacts at the TOP of the lane and apexes at the bottom -- the mirror of
@@ -199,8 +245,17 @@ function plotValue(prop, v) {
 }
 
 function laneBounds(kfs, prop) {
+  // Fit the value axis to the keys inside the window, plus one neighbour
+  // each side so a segment entering or leaving the view still fits.
+  let lo = kfs.length, hi = -1;
+  kfs.forEach((k, i) => {
+    if (k.time >= viewT0 && k.time <= viewT1) { if (i < lo) lo = i; if (i > hi) hi = i; }
+  });
+  if (hi < 0) { lo = 0; hi = kfs.length - 1; }
+  const inView = kfs.slice(Math.max(0, lo - 1), Math.min(kfs.length, hi + 2));
+
   let min = Infinity, max = -Infinity;
-  for (const k of kfs) {
+  for (const k of inView) {
     for (const raw of [k.value,
                        k.inHandle ? k.value + k.inHandle.dv : k.value,
                        k.outHandle ? k.value + k.outHandle.dv : k.value]) {
@@ -219,6 +274,30 @@ function laneBounds(kfs, prop) {
   return [prop === "y" && min === 0 ? 0 : min - pad, max + pad];
 }
 
+// Units are absolute per schema.ts: px for x/y, a unitless ratio for
+// scale, degrees for rotation.
+const UNITS = { x: "px", y: "px", scaleX: "", scaleY: "", rotation: "\u00b0" };
+
+/** Tick positions on a 1/2/5 x 10^n ladder -- the steps people read
+ * without doing arithmetic. Returns [] rather than looping forever on a
+ * degenerate range. */
+function ticks(min, max, target) {
+  const span = max - min;
+  if (!isFinite(span) || span <= 0 || target < 1) return [];
+  const mag = Math.pow(10, Math.floor(Math.log10(span / target)));
+  const norm = span / target / mag;
+  const step = (norm <= 1 ? 1 : norm <= 2 ? 2 : norm <= 5 ? 5 : 10) * mag;
+  const out = [];
+  for (let v = Math.ceil(min / step) * step; v <= max + step * 1e-6; v += step) {
+    out.push({ v, step });
+    if (out.length > 40) break;
+  }
+  return out;
+}
+
+const tickLabel = (v, step, unit) =>
+  v.toFixed(Math.max(0, -Math.floor(Math.log10(step)))) + unit;
+
 const svgNS = "http://www.w3.org/2000/svg";
 function el(name, attrs) {
   const n = document.createElementNS(svgNS, name);
@@ -226,32 +305,62 @@ function el(name, attrs) {
   return n;
 }
 
-const totalH = MT + ACTIVE.length * (LANE_H + LANE_GAP) + MB;
-const svg = el("svg", { width: W, height: totalH, style: "display:block" });
+// {prop, host, ph, width} per graph -- width is needed to place the
+// playhead, since each card can be a different size.
+const graphs = [];
 
-ACTIVE.forEach((prop, idx) => {
+// One SVG per channel, each in its own card. The cards share a playhead
+// position so scrubbing moves every graph together.
+function buildGraph(prop, host, W, H) {
+  const tToX = (t) => tToXw(t, W);
+  const PLOT_W = plotW(W);
+  const LANE_H = Math.max(H - MT - MB, 60);
+  const GRAPH_H = MT + LANE_H + MB;
+  host.textContent = "";
+
   const kfs = CURVES.properties[prop];
-  const top = MT + idx * (LANE_H + LANE_GAP);
+  const top = MT;
   const [vMin, vMax] = laneBounds(kfs, prop);
   const vToY = (v) => top + LANE_H - ((v - vMin) / (vMax - vMin || 1)) * LANE_H;
   const pv = (raw) => vToY(plotValue(prop, raw));
 
+  const svg = el("svg", { width: W, height: GRAPH_H });
   svg.appendChild(el("rect", { x: ML, y: top, width: PLOT_W, height: LANE_H,
-    fill: "none", stroke: "var(--border)" }));
-  const label = el("text", { x: 8, y: top + 14, "font-size": 11, fill: "var(--text)" });
-  label.textContent = prop === "y" ? "y (height)" : prop;
-  svg.appendChild(label);
-  for (const [v, anchor] of [[vMax, top + 10], [vMin, top + LANE_H - 2]]) {
-    const t = el("text", { x: ML - 6, y: anchor, "font-size": 9, fill: "var(--muted)", "text-anchor": "end" });
-    t.textContent = v.toFixed(0);
-    svg.appendChild(t);
+    fill: "none", stroke: "var(--line)" }));
+
+  // Grid first, so the curve and keys paint over it.
+  const unit = UNITS[prop] ?? "";
+  for (const { v, step } of ticks(vMin, vMax, 4)) {
+    const y = vToY(v);
+    svg.appendChild(el("line", { x1: ML, y1: y, x2: ML + PLOT_W, y2: y, stroke: "var(--line)" }));
+    const lab = el("text", { x: ML - 6, y: y + 4, fill: "var(--faint)", "text-anchor": "end" });
+    lab.textContent = tickLabel(v, step, unit);
+    svg.appendChild(lab);
+  }
+  for (const { v, step } of ticks(viewT0, viewT1, Math.max(2, Math.round(PLOT_W / 90)))) {
+    const x = tToX(v);
+    svg.appendChild(el("line", { x1: x, y1: top, x2: x, y2: top + LANE_H, stroke: "var(--line)" }));
+    const anchor = x <= ML + 2 ? "start" : x >= ML + PLOT_W - 2 ? "end" : "middle";
+    const lab = el("text", { x, y: top + LANE_H + 16, fill: "var(--faint)", "text-anchor": anchor });
+    lab.textContent = tickLabel(v, step, "s");
+    svg.appendChild(lab);
   }
 
   // Floor reference, so contacts are visibly sitting ON something.
   if (prop === "y" && vMin <= 0 && vMax >= 0) {
     svg.appendChild(el("line", { x1: ML, y1: vToY(0), x2: ML + PLOT_W, y2: vToY(0),
-      stroke: "var(--floor)", "stroke-width": 1, "stroke-dasharray": "3 3", opacity: 0.7 }));
+      stroke: "var(--faint)", "stroke-width": 1, "stroke-dasharray": "3 3" }));
   }
+
+  // Clip the data marks: once zoomed, segments run past the lane and would
+  // otherwise paint over the axis labels.
+  const clipId = "clip-" + prop;
+  const defs = el("defs", {});
+  const clip = el("clipPath", { id: clipId });
+  clip.appendChild(el("rect", { x: ML, y: top, width: PLOT_W, height: LANE_H }));
+  defs.appendChild(clip);
+  svg.appendChild(defs);
+  const marks = el("g", { "clip-path": "url(#" + clipId + ")" });
 
   // Real cubic segments -- the whole point of this view.
   let d = "";
@@ -262,20 +371,20 @@ ACTIVE.forEach((prop, idx) => {
               + tToX(p2[0]).toFixed(2) + " " + pv(p2[1]).toFixed(2) + ", "
               + tToX(p3[0]).toFixed(2) + " " + pv(p3[1]).toFixed(2) + " ";
   }
-  if (d) svg.appendChild(el("path", { d, fill: "none", stroke: "var(--curve)", "stroke-width": 1.6 }));
+  if (d) marks.appendChild(el("path", { d, fill: "none", stroke: "var(--ink)", "stroke-width": 1.6 }));
 
+  const keyPts = [];
   kfs.forEach((k, ki) => {
     const px = tToX(k.time), py = pv(k.value);
+    keyPts.push({ t: k.time, x: px, y: py });
     for (const h of [k.inHandle, k.outHandle]) {
       if (!h) continue;
       const hx = tToX(k.time + h.dt), hy = pv(k.value + h.dv);
-      svg.appendChild(el("line", { x1: px, y1: py, x2: hx, y2: hy,
-        stroke: "var(--handle)", "stroke-width": 1.2 }));
-      svg.appendChild(el("rect", { x: hx - 2, y: hy - 2, width: 4, height: 4, fill: "var(--handle)" }));
+      marks.appendChild(el("line", { x1: px, y1: py, x2: hx, y2: hy,
+        stroke: "var(--key)", "stroke-width": 1.2 }));
+      marks.appendChild(el("rect", { x: hx - 2, y: hy - 2, width: 4, height: 4, fill: "var(--key)" }));
     }
-    const dot = el("circle", { cx: px, cy: py, r: 3.6, fill: "var(--key)",
-      style: "cursor:pointer" });
-    dot.addEventListener("click", () => { pause(); setTime(k.time); });
+    const dot = el("circle", { cx: px, cy: py, r: 3.6, fill: "var(--key)" });
     const tip = el("title");
     // Raw value stays visible in the tooltip: the lane plots height, but
     // curves.json stores screen-space y, and those must stay reconcilable.
@@ -285,26 +394,113 @@ ACTIVE.forEach((prop, idx) => {
     tip.textContent = prop + " key " + ki + " @ " + k.time.toFixed(3) + "s = " + valueText
       + "\\n" + (k.easeSource || "?") + (k.presetName ? " (" + k.presetName + ")" : "");
     dot.appendChild(tip);
-    svg.appendChild(dot);
+    marks.appendChild(dot);
   });
-});
 
-const axisY = totalH - MB + 12;
-svg.appendChild(el("line", { x1: ML, y1: axisY - 10, x2: W - MR, y2: axisY - 10, stroke: "var(--muted)" }));
-for (const [t, anchor] of [[0, "start"], [DURATION, "end"]]) {
-  const lab = el("text", { x: tToX(t), y: axisY + 4, "font-size": 10, fill: "var(--muted)", "text-anchor": anchor });
-  lab.textContent = t.toFixed(2) + "s";
-  svg.appendChild(lab);
+  svg.appendChild(marks);
+
+  const ph = el("line", { x1: ML, y1: top, x2: ML, y2: top + LANE_H,
+    stroke: "var(--playhead)", "stroke-width": 1.4, "pointer-events": "none",
+    "clip-path": "url(#" + clipId + ")" });
+  svg.appendChild(ph);
+
+  // Drag a box over the plot: the keys that fall INSIDE it are the
+  // selection, and releasing zooms every graph to the time span those keys
+  // cover. Hit-testing the box (rather than just its x range) means a key
+  // that is in the right time range but far off in value is not dragged in.
+  const brush = el("rect", { fill: "var(--select)", stroke: "var(--key)",
+    "stroke-width": 1, "pointer-events": "none", visibility: "hidden" });
+  svg.appendChild(brush);
+  svg.style.cursor = "crosshair";
+
+  let dragFrom = null;
+  const localPt = (e) => {
+    const r = svg.getBoundingClientRect();
+    return { x: e.clientX - r.left, y: e.clientY - r.top };
+  };
+  const boxOf = (pt) => ({
+    x0: Math.max(Math.min(dragFrom.x, pt.x), ML),
+    x1: Math.min(Math.max(dragFrom.x, pt.x), ML + PLOT_W),
+    y0: Math.max(Math.min(dragFrom.y, pt.y), top),
+    y1: Math.min(Math.max(dragFrom.y, pt.y), top + LANE_H),
+  });
+  svg.addEventListener("pointerdown", (e) => {
+    dragFrom = localPt(e);
+    svg.setPointerCapture(e.pointerId);
+  });
+  svg.addEventListener("pointermove", (e) => {
+    if (!dragFrom) return;
+    const b = boxOf(localPt(e));
+    brush.setAttribute("x", b.x0);
+    brush.setAttribute("y", b.y0);
+    brush.setAttribute("width", Math.max(b.x1 - b.x0, 0));
+    brush.setAttribute("height", Math.max(b.y1 - b.y0, 0));
+    brush.setAttribute("visibility", (b.x1 - b.x0 > 1 || b.y1 - b.y0 > 1) ? "visible" : "hidden");
+  });
+  const endDrag = (e) => {
+    if (!dragFrom) return;
+    const pt = localPt(e);
+    const moved = Math.hypot(pt.x - dragFrom.x, pt.y - dragFrom.y);
+    const b = boxOf(pt);
+    dragFrom = null;
+    brush.setAttribute("visibility", "hidden");
+    if (svg.hasPointerCapture(e.pointerId)) svg.releasePointerCapture(e.pointerId);
+    if (moved < 4) return;
+    const picked = keyPts.filter((k) => k.x >= b.x0 && k.x <= b.x1 && k.y >= b.y0 && k.y <= b.y1);
+    if (picked.length === 0) return;   // empty box: leave the view alone
+    const lo = Math.min(...picked.map((k) => k.t));
+    const hi = Math.max(...picked.map((k) => k.t));
+    // Pad so the outermost keys are not pinned to the lane edge, and so a
+    // single selected key still yields a usable window.
+    const pad = Math.max((hi - lo) * 0.1, DURATION * 0.02);
+    zoomTo(lo - pad, hi + pad);
+  };
+  svg.addEventListener("pointerup", endDrag);
+  svg.addEventListener("pointercancel", endDrag);
+  svg.addEventListener("dblclick", resetZoom);
+  host.appendChild(svg);
+  return ph;
 }
 
-const playhead = el("line", { x1: ML, y1: MT, x2: ML, y2: totalH - MB,
-  stroke: "var(--playhead)", "stroke-width": 1.4 });
-svg.appendChild(playhead);
-document.getElementById("graph").appendChild(svg);
+function rebuildAll() {
+  for (const g of graphs) { g.width = 0; g.height = 0; }
+  layoutGraphs();
+}
+
+function zoomTo(t0, t1) {
+  const lo = Math.max(0, Math.min(t0, t1));
+  const hi = Math.min(DURATION, Math.max(t0, t1));
+  if (hi - lo < 1e-3) return;
+  viewT0 = lo; viewT1 = hi;
+  rebuildAll();
+}
+
+function resetZoom() {
+  if (!isZoomed()) return;
+  viewT0 = 0; viewT1 = DURATION;
+  rebuildAll();
+}
+
+function layoutGraphs() {
+  layoutStage();
+  for (const g of graphs) {
+    const w = Math.max(Math.round(g.host.clientWidth), MIN_W);
+    const h = Math.max(Math.round(g.host.clientHeight), MIN_H);
+    if (w === g.width && h === g.height) continue;
+    g.width = w;
+    g.height = h;
+    g.ph = buildGraph(g.prop, g.host, w, h);
+  }
+  draw(now);
+}
+
+ACTIVE.forEach((prop) => {
+  const host = document.querySelector('[data-prop="' + prop + '"]');
+  if (host) graphs.push({ prop, host, ph: null, width: 0, height: 0 });
+});
 
 // --------------------------------------------------------------- playback
 const scrub = document.getElementById("scrub");
-const readout = document.getElementById("readout");
 const playBtn = document.getElementById("play");
 scrub.max = String(DURATION);
 
@@ -327,10 +523,12 @@ function draw(t) {
   const top = (s.y - BALL_D / 2) * SCALE;
   ball.style.transform = "translate(" + left + "px," + top + "px) scale("
     + s.scaleX + "," + s.scaleY + ") rotate(" + s.rotation + "deg)";
-  playhead.setAttribute("x1", tToX(t));
-  playhead.setAttribute("x2", tToX(t));
-  readout.textContent = "t=" + t.toFixed(3) + "s  x=" + s.x.toFixed(1)
-    + "  y=" + s.y.toFixed(1) + "  (" + (FLOOR_Y - s.y).toFixed(1) + "px above floor)";
+  for (const g of graphs) {
+    if (!g.ph) continue;
+    const phx = tToXw(t, g.width);
+    g.ph.setAttribute("x1", phx);
+    g.ph.setAttribute("x2", phx);
+  }
 }
 
 function setTime(t) {
@@ -341,7 +539,8 @@ function setTime(t) {
 
 function pause() {
   playing = false;
-  playBtn.textContent = "Play";
+  playBtn.innerHTML = ICON_PLAY;
+  playBtn.setAttribute("aria-label", "play");
   if (rafId !== null) { cancelAnimationFrame(rafId); rafId = null; }
 }
 
@@ -358,24 +557,12 @@ function tick(ts) {
 playBtn.addEventListener("click", () => {
   if (playing) { pause(); return; }
   playing = true;
-  playBtn.textContent = "Pause";
+  playBtn.innerHTML = ICON_PAUSE;
+  playBtn.setAttribute("aria-label", "pause");
   lastFrame = 0;
   rafId = requestAnimationFrame(tick);
 });
 scrub.addEventListener("input", () => { pause(); setTime(parseFloat(scrub.value)); });
-
-// Keyframe stepping walks the y channel, where contacts and apexes live.
-const stepTimes = (CURVES.properties.y || []).map((k) => k.time);
-document.getElementById("prevKey").addEventListener("click", () => {
-  pause();
-  const prev = stepTimes.filter((t) => t < now - 1e-4).pop();
-  setTime(prev === undefined ? 0 : prev);
-});
-document.getElementById("nextKey").addEventListener("click", () => {
-  pause();
-  const next = stepTimes.find((t) => t > now + 1e-4);
-  setTime(next === undefined ? DURATION : next);
-});
 
 if ((CURVES.extractionWarnings || []).length > 0) {
   const box = document.createElement("div");
@@ -383,6 +570,20 @@ if ((CURVES.extractionWarnings || []).length > 0) {
   box.textContent = "Extraction warnings: " + CURVES.extractionWarnings.join(" | ");
   document.getElementById("warnings").appendChild(box);
 }
+
+layoutGraphs();
+// Modifiers are guarded so this never shadows the browser's own reload.
+document.addEventListener("keydown", (e) => {
+  if (e.metaKey || e.ctrlKey || e.altKey) return;
+  if (e.key === "r" || e.key === "R") resetZoom();
+});
+// Re-render on resize so the plots keep filling their column.
+let resizePending = false;
+new ResizeObserver(() => {
+  if (resizePending) return;
+  resizePending = true;
+  requestAnimationFrame(() => { resizePending = false; layoutGraphs(); });
+}).observe(document.querySelector(".panes"));
 
 setTime(0);
 </script>
