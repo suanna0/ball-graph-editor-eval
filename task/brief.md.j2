@@ -17,7 +17,8 @@ the screen, in {{ framework }}.
 
 ## Material
 
-The ball is a {{ material_label }}. Make the bounce behavior and look
+The ball is a {{ material_label }}. Make the bounce behavior -- how high it
+rebounds, how much energy it keeps, how many bounces before it settles --
 believable for that material.
 
 ## Constraints
@@ -26,20 +27,23 @@ believable for that material.
   physics simulation loop (no per-frame velocity/gravity integration in
   JavaScript). The animation must be fully described by the keyframes and
   their easing, exactly as {{ framework }} normally expresses motion.
+- Animate the ball's POSITION only. Do not keyframe scale, rotation,
+  opacity or any other property -- the bounce must read entirely from the
+  position curves.
 - The starting source files are already in this directory. Edit them
   directly; do not restructure the project layout.
 {%- if framework == "css" %}
 - Edit `style.css`. Use a `@keyframes` rule on `#ball`, driven by its
-  `transform` (`translate`, `scale`, `rotate`) and `animation-timing-function`.
+  `transform` (`translateX`/`translateY`) and `animation-timing-function`.
 {%- elif framework == "gsap" %}
 - Edit `animation.js`. Use GSAP (`gsap.to` / `gsap.timeline`) to animate
-  `#ball`'s position, scale and rotation. GSAP is already loaded globally
+  `#ball`'s position (`x` / `y`). GSAP is already loaded globally
   via the `<script>` tag in `index.html` -- do not replace it with a bundled
   import.
 {%- elif framework == "lottie" %}
 - Edit `animation.json` directly (standard Lottie/Bodymovin format). The
-  ball is the shape layer named `ball`; animate its transform (`ks.p`,
-  `ks.s`, `ks.r`) with keyframed values and bezier easing (`i`/`o`).
+  ball is the shape layer named `ball`; animate its position (`ks.p`)
+  with keyframed values and bezier easing (`i`/`o`).
   `index.html` already loads it with lottie-web; do not change the player
   setup.
 {%- endif %}

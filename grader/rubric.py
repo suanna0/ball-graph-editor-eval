@@ -77,7 +77,13 @@ The graph-editor rubric, for reference (not implemented here):
        increase and fails concavity, while an overshoot fails
        monotonicity. A merely decelerating tail is a legitimate ease-out
        and passes.
-    5. No stray keys on unused channels (rotate, visibility, etc.)
+    5. No stray keys on unused channels (rotate, visibility, etc.). As of
+       2026-11-17 the brief scopes the task to POSITION ONLY and explicitly
+       forbids keying scale/rotation/opacity, so scaleX, scaleY and
+       rotation are all genuinely stray here and this check can be strict:
+       each of those channels must have 0 or 1 keyframes. Before that the
+       brief invited scale and rotation, which would have made penalizing
+       them unfair -- if the brief is ever widened again, loosen this.
 
 See tolerances.yaml for where weights/tolerances should live once this is
 implemented.
