@@ -48,11 +48,19 @@ feedback_modes:
     tools: [read_file, write_file, list_dir, bash, render_graph, finish]
 
 # Per-rollout limits. Uniform across models and frameworks.
+#
+# TIGHTENED FOR SMOKE RUNS (2026-11-17). These are part of the task spec,
+# so they change what the eval measures: a model that would have finished
+# in 45 turns now fails at 30. Restore the full values below before any
+# run whose scores you intend to compare or publish. Each run dir freezes
+# its own copy of this file, so every record states which limits it ran
+# under.  Full values: wall_clock_seconds 1800, max_turns 60,
+# max_output_tokens 128000, max_tool_calls 200.
 limits:
-  wall_clock_seconds: 1800
-  max_turns: 60
-  max_output_tokens: 128000
-  max_tool_calls: 200
+  wall_clock_seconds: 900
+  max_turns: 30
+  max_output_tokens: 64000
+  max_tool_calls: 100
 
 # Host-only. Never copied into the worker's container or exposed through
 # any worker tool. Extraction always re-derives curves from the frozen
