@@ -24,12 +24,29 @@ const FLOOR_Y = 460;
 // Inline SVG rather than text glyphs, so the shape does not depend on the
 // font having them. currentColor picks up the button's inherited ink.
 const ICON_PLAY =
-  '<svg viewBox="0 0 12 12" width="11" height="11" aria-hidden="true">' +
+  '<svg viewBox="0 0 12 12" width="12.1" height="12.1" aria-hidden="true">' +
   '<path d="M4.2 2.6 L9.4 6 L4.2 9.4 Z" fill="currentColor"/></svg>';
 const ICON_PAUSE =
-  '<svg viewBox="0 0 12 12" width="11" height="11" aria-hidden="true">' +
+  '<svg viewBox="0 0 12 12" width="12.1" height="12.1" aria-hidden="true">' +
   '<rect x="3.6" y="2.6" width="1.9" height="6.8" fill="currentColor"/>' +
   '<rect x="6.5" y="2.6" width="1.9" height="6.8" fill="currentColor"/></svg>';
+// Four small corner marks, filled rather than stroked to match the
+// play/pause glyphs -- the standard fullscreen / fullscreen-exit icon
+// (Material Symbols "fullscreen" / "fullscreen_exit", scaled from its
+// 24x24 original to this 12x12 grid). EXPAND's marks sit flush against the
+// corners pointing out; COLLAPSE's are pulled in, pointing back at them.
+const ICON_EXPAND =
+  '<svg viewBox="0 0 12 12" width="12.1" height="12.1" aria-hidden="true">' +
+  '<path fill="currentColor" d="M3.5 7 L2.5 7 L2.5 9.5 L5 9.5 L5 8.5 L3.5 8.5 Z ' +
+  'M2.5 5 L3.5 5 L3.5 3.5 L5 3.5 L5 2.5 L2.5 2.5 Z ' +
+  'M8.5 8.5 L7 8.5 L7 9.5 L9.5 9.5 L9.5 7 L8.5 7 Z ' +
+  'M7 2.5 L7 3.5 L8.5 3.5 L8.5 5 L9.5 5 L9.5 2.5 Z"/></svg>';
+const ICON_COLLAPSE =
+  '<svg viewBox="0 0 12 12" width="12.1" height="12.1" aria-hidden="true">' +
+  '<path fill="currentColor" d="M2.5 8 L4 8 L4 9.5 L5 9.5 L5 7 L2.5 7 Z ' +
+  'M4 4 L2.5 4 L2.5 5 L5 5 L5 2.5 L4 2.5 Z ' +
+  'M7 9.5 L8 9.5 L8 8 L9.5 8 L9.5 7 L7 7 Z ' +
+  'M8 4 L8 2.5 L7 2.5 L7 5 L9.5 5 L9.5 4 Z"/></svg>';
 
 /** Embeds JSON in a <script> safely: `<` is escaped so a string containing
  * "</script>" cannot terminate the tag early. */
@@ -47,6 +64,7 @@ export function renderViewerHtml(curves: CanonicalCurveSet): string {
     .map((prop) => `  <div class="pane">
     <h2>${prop}</h2>
     <div class="graph" data-prop="${prop}"></div>
+    <button class="expand-btn" aria-label="expand">${ICON_EXPAND}</button>
   </div>`)
     .join("\n");
   return `<!doctype html>
@@ -83,9 +101,9 @@ export function renderViewerHtml(curves: CanonicalCurveSet): string {
      reachable if content ever outgrows the viewport, where plain centring
      would clip it out of scroll range. (No backticks in here -- this CSS
      lives inside a TS template literal and one would terminate it.) */
-  body { margin: 0; padding: 16px; min-height: 100vh; display: flex; flex-direction: column;
+  body { margin: 0; padding: 32px; min-height: 100vh; display: flex; flex-direction: column;
          justify-content: center; justify-content: safe center;
-         font: var(--type); background: var(--surface); color: var(--ink); }
+         font: var(--type); background: #eee; color: var(--ink); }
   h2 { font: inherit; margin: 0; }
   button, input { font: inherit; color: inherit; }
 
@@ -93,22 +111,66 @@ export function renderViewerHtml(curves: CanonicalCurveSet): string {
      count, because the cards come from whichever channels carry keys. */
   .panes { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
            grid-auto-rows: 1fr; gap: 16px; }
-  .pane { display: flex; flex-direction: column; min-width: 0; padding: 8px;
-          background: var(--panel); border: 1px solid var(--line); border-radius: 6px; }
-  .pane h2 { margin-bottom: 6px; color: var(--faint); text-transform: uppercase; text-align: center; }
+  .pane { position: relative; display: flex; flex-direction: column; min-width: 0; padding: 8px;
+          background: #fff; }
+  .pane h2 { margin-bottom: 6px; color: var(--faint); text-align: center; }
+
+  /* Sits over the card's own content, so it needs the surface fill behind
+     it to stay legible rather than blending into the curve or tick labels
+     it overlaps. */
+  .expand-btn { position: absolute; right: 8px; bottom: 8px; z-index: 1; }
+
+  /* Fullscreen lightbox: the clicked pane itself (same DOM node, including
+     its live stage/graph and listeners) is moved in here rather than
+     cloned, so playback and zoom state keep working at the larger size. */
+  #lightbox { position: fixed; inset: 0; z-index: 1000; display: none;
+              align-items: center; justify-content: center;
+              padding: 32px; background: rgba(0, 0, 0, 0.55); }
+  #lightbox.open { display: flex; }
+  #lightbox .pane { width: min(1100px, 92vw); height: min(820px, 92vh); }
+  /* The stage's height comes from its own width via a fixed aspect ratio
+     (layoutStage), not from flex-grow like a graph's plot -- so forcing it
+     to the same tall box as a graph pane would just leave dead space below
+     the controls. Let it size to its own content instead. */
+  #lightbox .pane-stage { height: auto; }
 
   #stage { position: relative; width: 100%; overflow: hidden;
            background: var(--surface); border: 1px solid var(--line); }
   #ball { position: absolute; border-radius: 50%; background: var(--key); }
   #floorLine { position: absolute; left: 0; width: 100%; border-top: 2px solid var(--faint); }
 
-  .controls { display: flex; align-items: center; gap: 10px; margin-top: 12px; flex-wrap: wrap; }
-  /* Circular, fixed size, so nothing shifts when the icon toggles. */
+  /* Right padding reserves the expand button's own corner (28px + its 8px
+     offset) so the absolutely-positioned button doesn't sit on top of the
+     scrub bar and cover its rounded end. */
+  .controls { display: flex; align-items: center; gap: 10px; margin-top: 12px; flex-wrap: wrap;
+              padding-right: 36px; }
+  /* Circular, fixed size, so nothing shifts when the icon toggles. Flat --
+     no hover state, so clicking it is the only feedback. */
   button { width: 28px; height: 28px; padding: 0; display: grid; place-items: center;
-           background: var(--surface); border: 1px solid var(--line);
+           background: var(--surface); border: none;
            border-radius: 50%; cursor: pointer; }
-  button:hover { background: var(--panel); }
-  #scrub { flex: 1; min-width: 220px; accent-color: var(--key); }
+
+  /* Appearance reset so the native track/thumb chrome (a bordered groove in
+     WebKit, a hover halo on the thumb) can't show through -- flat, static,
+     no hover state, matching the play button. */
+  #scrub { flex: 1; min-width: 220px; -webkit-appearance: none; appearance: none;
+           background: transparent; cursor: pointer; }
+  /* Progress reads from the track fill itself (--pct, written in setTime),
+     not a thumb marker -- so the thumb stays only as an invisible drag
+     handle. Vendor pseudo-elements can't be grouped in one selector list --
+     an engine that doesn't recognize one drops the whole rule, track
+     included. */
+  #scrub::-webkit-slider-runnable-track {
+    -webkit-appearance: none; height: 4px; border: none; border-radius: 2px;
+    background: linear-gradient(to right, var(--ink) var(--pct, 0%), var(--line) var(--pct, 0%)); }
+  #scrub::-moz-range-track {
+    height: 4px; border: none; border-radius: 2px;
+    background: linear-gradient(to right, var(--ink) var(--pct, 0%), var(--line) var(--pct, 0%)); }
+  #scrub::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px;
+           margin-top: -5px; border: none; border-radius: 50%; background: transparent;
+           box-shadow: none; }
+  #scrub::-moz-range-thumb { width: 14px; height: 14px; border: none; border-radius: 50%;
+           background: transparent; box-shadow: none; }
 
   /* Plot absorbs the card, rather than sitting centred in spare room. */
   .graph { flex: 1; min-width: 0; min-height: 0; }
@@ -120,26 +182,30 @@ export function renderViewerHtml(curves: CanonicalCurveSet): string {
 </head>
 <body>
 <div class="panes">
-  <div class="pane">
-    <h2>viewport</h2>
+  <div class="pane pane-stage">
+    <h2>Viewport</h2>
     <div id="stage"></div>
     <div class="controls">
       <button id="play" aria-label="play">${ICON_PLAY}</button>
       <input type="range" id="scrub" min="0" max="1" step="0.0005" value="0" />
     </div>
+    <button class="expand-btn" aria-label="expand">${ICON_EXPAND}</button>
   </div>
 
 ${graphPanes}
 </div>
 
-<p class="hint">drag across graph to zoom &middot; 'r' to reset zoom</p>
+<p class="hint">drag across graph to zoom<br>'r' to reset zoom</p>
 
 
 <div id="warnings"></div>
+<div id="lightbox"></div>
 
 <script>
 const ICON_PLAY = ${embedJson(ICON_PLAY)};
 const ICON_PAUSE = ${embedJson(ICON_PAUSE)};
+const ICON_EXPAND = ${embedJson(ICON_EXPAND)};
+const ICON_COLLAPSE = ${embedJson(ICON_COLLAPSE)};
 const CURVES = ${embedJson(curves)};
 const VIEWPORT = ${embedJson(VIEWPORT)};
 const BALL_D = ${BALL_DIAMETER};
@@ -265,13 +331,16 @@ function laneBounds(kfs, prop) {
     }
   }
   if (!isFinite(min)) { min = 0; max = 1; }
-  // Pin the floor (height 0) to the bottom of the y lane, unless the ball
+  // Keep the floor (height 0) visible in the y lane, unless the ball
   // actually goes below it -- sinking past the floor is a real failure the
-  // rubric checks for, so it must stay visible rather than be cropped.
+  // rubric checks for, so it must stay visible rather than be cropped. It
+  // still gets the normal padding below it, rather than sitting flush
+  // against the bottom edge, so contact keyframes and their handles aren't
+  // clipped.
   if (prop === "y") min = Math.min(min, 0);
   if (min === max) { min -= 1; max += 1; }
   const pad = (max - min) * 0.15;
-  return [prop === "y" && min === 0 ? 0 : min - pad, max + pad];
+  return [min - pad, max + pad];
 }
 
 // Units are absolute per schema.ts: px for x/y, a unitless ratio for
@@ -328,9 +397,12 @@ function buildGraph(prop, host, W, H) {
   svg.appendChild(el("rect", { x: ML, y: top, width: PLOT_W, height: LANE_H,
     fill: "none", stroke: "var(--line)" }));
 
-  // Grid first, so the curve and keys paint over it.
+  // Grid first, so the curve and keys paint over it. Target spacing in
+  // pixels, like the time axis below, rather than a flat tick count -- so
+  // a small card stays uncluttered but the lightbox's much taller lane
+  // gets proportionally more horizontal gridlines instead of just 1-2.
   const unit = UNITS[prop] ?? "";
-  for (const { v, step } of ticks(vMin, vMax, 4)) {
+  for (const { v, step } of ticks(vMin, vMax, Math.max(2, Math.round(LANE_H / 60)))) {
     const y = vToY(v);
     svg.appendChild(el("line", { x1: ML, y1: y, x2: ML + PLOT_W, y2: y, stroke: "var(--line)" }));
     const lab = el("text", { x: ML - 6, y: y + 4, fill: "var(--faint)", "text-anchor": "end" });
@@ -362,14 +434,28 @@ function buildGraph(prop, host, W, H) {
   svg.appendChild(defs);
   const marks = el("g", { "clip-path": "url(#" + clipId + ")" });
 
-  // Real cubic segments -- the whole point of this view.
+  // Real cubic segments -- the whole point of this view. A keyframe list
+  // doesn't have to span [0, DURATION]: valueAt() holds the first/last
+  // keyframe's value outside that range, so the curve is drawn flat there
+  // too, rather than just stopping at the last keyframe.
   let d = "";
+  if (kfs.length > 0 && kfs[0].time > 0) {
+    d += "M " + tToX(0).toFixed(2) + " " + pv(kfs[0].value).toFixed(2) + " "
+       + "L " + tToX(kfs[0].time).toFixed(2) + " " + pv(kfs[0].value).toFixed(2) + " ";
+  }
   for (let i = 0; i < kfs.length - 1; i++) {
     const [p0, p1, p2, p3] = controlPoints(kfs[i], kfs[i + 1]);
-    if (i === 0) d += "M " + tToX(p0[0]).toFixed(2) + " " + pv(p0[1]).toFixed(2) + " ";
+    if (i === 0 && !d) d += "M " + tToX(p0[0]).toFixed(2) + " " + pv(p0[1]).toFixed(2) + " ";
     d += "C " + tToX(p1[0]).toFixed(2) + " " + pv(p1[1]).toFixed(2) + ", "
               + tToX(p2[0]).toFixed(2) + " " + pv(p2[1]).toFixed(2) + ", "
               + tToX(p3[0]).toFixed(2) + " " + pv(p3[1]).toFixed(2) + " ";
+  }
+  if (kfs.length > 0) {
+    const last = kfs[kfs.length - 1];
+    if (last.time < DURATION) {
+      if (!d) d += "M " + tToX(last.time).toFixed(2) + " " + pv(last.value).toFixed(2) + " ";
+      d += "L " + tToX(DURATION).toFixed(2) + " " + pv(last.value).toFixed(2) + " ";
+    }
   }
   if (d) marks.appendChild(el("path", { d, fill: "none", stroke: "var(--ink)", "stroke-width": 1.6 }));
 
@@ -494,10 +580,75 @@ function layoutGraphs() {
   draw(now);
 }
 
+// .panes uses grid-auto-rows: 1fr, which with no definite container height
+// sizes the row to its tallest item's own content height -- so a graph's
+// SVG (sized to fill its card, per buildGraph) and the row height it sits
+// in are circular: whatever height the SVG already has is what the row
+// (and therefore every clientHeight read in layoutGraphs) reports back,
+// so a still-oversized SVG from the lightbox never shrinks on its own.
+// Clearing every host first breaks the loop by letting the row settle on
+// real content (the viewport stage, sized from width alone) before the
+// graphs measure and rebuild against that settled height.
+function resetGraphs() {
+  for (const g of graphs) { g.host.textContent = ""; g.width = 0; g.height = 0; }
+}
+
 ACTIVE.forEach((prop) => {
   const host = document.querySelector('[data-prop="' + prop + '"]');
   if (host) graphs.push({ prop, host, ph: null, width: 0, height: 0 });
 });
+
+// ------------------------------------------------------------------ lightbox
+// The clicked pane is relocated into #lightbox and back, not cloned --
+// cloning would leave the clone's #ball and SVG listeners dead, since draw()
+// and the brush handlers reference the one node that already exists.
+const lightbox = document.getElementById("lightbox");
+let expandedPane = null, homeParent = null, placeholder = null;
+
+function openLightbox(pane) {
+  if (expandedPane) return;
+  expandedPane = pane;
+  homeParent = pane.parentElement;
+  // .panes uses grid-template-columns: auto-fit, which collapses a track
+  // that has no item in it -- so just removing the pane would let the
+  // other cards stretch to fill the gap. A same-class placeholder left
+  // behind keeps the column count (and the siblings' width) unchanged.
+  placeholder = document.createElement("div");
+  placeholder.className = "pane";
+  placeholder.style.visibility = "hidden";
+  homeParent.replaceChild(placeholder, pane);
+  lightbox.appendChild(pane);
+  lightbox.classList.add("open");
+  const btn = pane.querySelector(".expand-btn");
+  btn.innerHTML = ICON_COLLAPSE;
+  btn.setAttribute("aria-label", "collapse");
+  resetGraphs(); // break the grid row-height feedback loop before remeasuring
+  layoutGraphs();
+}
+
+function closeLightbox() {
+  if (!expandedPane) return;
+  const pane = expandedPane;
+  expandedPane = null;
+  homeParent.replaceChild(pane, placeholder);
+  placeholder = null;
+  lightbox.classList.remove("open");
+  const btn = pane.querySelector(".expand-btn");
+  btn.innerHTML = ICON_EXPAND;
+  btn.setAttribute("aria-label", "expand");
+  resetGraphs();
+  layoutGraphs();
+}
+
+document.querySelectorAll(".expand-btn").forEach((btn) => {
+  btn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    const pane = btn.closest(".pane");
+    if (expandedPane === pane) closeLightbox(); else openLightbox(pane);
+  });
+});
+// Click the backdrop, not the pane sitting on it, to close.
+lightbox.addEventListener("click", (e) => { if (e.target === lightbox) closeLightbox(); });
 
 // --------------------------------------------------------------- playback
 const scrub = document.getElementById("scrub");
@@ -534,6 +685,7 @@ function draw(t) {
 function setTime(t) {
   now = Math.min(Math.max(t, 0), DURATION);
   scrub.value = String(now);
+  scrub.style.setProperty("--pct", (now / DURATION * 100) + "%");
   draw(now);
 }
 
@@ -576,6 +728,11 @@ layoutGraphs();
 document.addEventListener("keydown", (e) => {
   if (e.metaKey || e.ctrlKey || e.altKey) return;
   if (e.key === "r" || e.key === "R") resetZoom();
+  if (e.key === " " || e.code === "Space") {
+    e.preventDefault(); // stop the page from scrolling on spacebar
+    playBtn.click();
+  }
+  if (e.key === "Escape") closeLightbox();
 });
 // Re-render on resize so the plots keep filling their column.
 let resizePending = false;
