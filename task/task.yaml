@@ -34,6 +34,7 @@ frameworks:
     buildless: true
 
 materials:
+  - rubber_ball
   - bowling_ball
   - beach_ball
   - ping_pong_ball

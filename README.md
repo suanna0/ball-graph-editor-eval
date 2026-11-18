@@ -109,14 +109,18 @@ computed from scratch, in a separate process, against the **frozen
 claiming to be its curves, so nothing done through that tool can influence
 the score.
 
-## The rubric is intentionally not implemented here
+## The rubric is the project owner's design
 
-`grader/rubric.py` and `grader/tolerances.yaml` are the project owner's own
-work. `grade.py` is written against a fixed interface
-(`score(curves: dict) -> {"score": float, "checks": {...}}`) so the rest of
-the pipeline -- extraction, the fixture/test scaffold, aggregation, the
-gallery -- can be built and tested independently with
-`python -m grader.grade <run-dir> --stub-rubric`.
+The 7 graph-editor checks (weights, tolerances, the arithmetic
+bounce-timing rule, all of it) in `grader/rubric.py`'s docstring are the
+project owner's own design, built up over several sessions -- see the
+module docstring there for the full spec. `grade.py` is written against a
+fixed interface (`score(curves: dict) -> {"score": float, "checks":
+{...}}`), so the rest of the pipeline -- extraction, the fixture/test
+scaffold, aggregation, the gallery -- was built and tested independently of
+the rubric with `python -m grader.grade <run-dir> --stub-rubric`, and that
+flag still works if you want to exercise the pipeline without the real
+checks.
 
 ## Testing
 
@@ -128,5 +132,21 @@ make test          # vitest (extractor) + pytest (grader scaffold)
 ## Deferred (not in this pass)
 
 Three.js render target, Web Animations API / Motion frameworks beyond
-CSS+GSAP+Lottie, a taste/preference layer (pairwise human preference +
-VLM judge), and the rubric itself.
+CSS+GSAP+Lottie, and a taste/preference layer (pairwise human preference +
+VLM judge).
+
+**Scope (2026-11-18):** `runner.yaml`'s grid currently runs a single
+material (`rubber_ball`) rather than the full `task.yaml` materials list
+(`beach_ball`, `bowling_ball`, `ping_pong_ball` are still defined there but
+unused). This experiment is scoped to a plain/vanilla bounce -- can the
+agent build a correct keyframed bounce at all -- rather than
+material-appropriate bounce *character* (a beach ball hanging in the air
+longer, a bowling ball barely bouncing), which the current rubric doesn't
+differentiate for. Two natural follow-on experiments, not started:
+
+- **Stylized/material-specific bounces.** Widen `grid.materials` and
+  extend the rubric to judge bounce character per material, rather than
+  one universal shape/timing rule for all three.
+- **Obstacle course.** A scene with more than a floor -- walls, ramps,
+  moving obstacles -- which would need a new task brief and a rubric built
+  for it from scratch, not an extension of this one.

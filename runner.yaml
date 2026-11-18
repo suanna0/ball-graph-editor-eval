@@ -27,7 +27,7 @@ worker:
 # and how many repeats (seeds) per cell. Must be subsets of task.yaml.
 grid:
   frameworks: [css]
-  materials: [bowling_ball]
+  materials: [rubber_ball]
   feedback_modes: [blind]
   seeds: 1
 
