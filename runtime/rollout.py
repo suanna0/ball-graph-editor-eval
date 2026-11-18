@@ -22,9 +22,22 @@ def _timestamp() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H-%M-%SZ")
 
 
-def new_run_dir(output_dir: Path, cell: Cell) -> Path:
+def new_batch_dir(output_dir: Path, label: str | None) -> Path:
+    """One directory per `run-batch` invocation, holding every cell it
+    ran. Groups a whole experiment together instead of flattening every
+    cell from every invocation into one pile."""
     output_dir.mkdir(parents=True, exist_ok=True)
-    d = output_dir / f"{_timestamp()}_{cell.cell_id}"
+    name = f"{_timestamp()}_{label}" if label else _timestamp()
+    d = output_dir / name
+    d.mkdir(parents=True, exist_ok=False)
+    return d
+
+
+def new_run_dir(batch_dir: Path, cell: Cell) -> Path:
+    # No per-cell timestamp -- the batch dir already carries one, and
+    # cell_id alone is unique within a single batch (expand_grid never
+    # repeats a cell).
+    d = batch_dir / cell.cell_id
     d.mkdir(parents=True, exist_ok=False)
     return d
 
@@ -70,6 +83,7 @@ def run_one_rollout(
     cell: Cell,
     task_yaml_path: Path,
     runner_yaml_path: Path,
+    batch_dir: Path,
 ) -> Path:
     if runner_cfg.provider != "anthropic":
         raise ValueError(f"unsupported provider: {runner_cfg.provider}")
@@ -77,7 +91,7 @@ def run_one_rollout(
     # Imported here so missing deps don't crash `--help`.
     from anthropic import Anthropic
 
-    run_dir = new_run_dir(runner_cfg.output_dir, cell)
+    run_dir = new_run_dir(batch_dir, cell)
     prompt_text = freeze_inputs(task, cell, task_yaml_path, runner_yaml_path, run_dir)
 
     feedback_spec = task.feedback_modes[cell.feedback_mode]

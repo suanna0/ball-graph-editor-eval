@@ -61,15 +61,16 @@ class GradedRun:
 
 
 def load_runs(runs_dir: Path) -> list[GradedRun]:
+    """A run dir is anything containing cell.json + score.json, found at
+    any depth under runs_dir -- flat (old layout) or grouped under a batch
+    dir (runs/<batch>/<cell_id>/, current layout), without caring which."""
     out: list[GradedRun] = []
     if not runs_dir.is_dir():
         return out
-    for d in sorted(runs_dir.iterdir()):
-        if not d.is_dir():
-            continue
-        cell_path = d / "cell.json"
+    for cell_path in sorted(runs_dir.rglob("cell.json")):
+        d = cell_path.parent
         score_path = d / "score.json"
-        if not cell_path.is_file() or not score_path.is_file():
+        if not score_path.is_file():
             continue
         cell = json.loads(cell_path.read_text())
         score = json.loads(score_path.read_text())

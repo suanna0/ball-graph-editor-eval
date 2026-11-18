@@ -1,11 +1,13 @@
 """Entry point.
 
     python -m runtime.cli run-batch [--task task/task.yaml] [--runner runner.yaml]
-                                     [--limit N] [--dry-run]
+                                     [--limit N] [--dry-run] [--label NAME]
 
 `--limit N` runs only the first N cells of the expanded grid (useful for a
 smoke test before spending on a full batch). `--dry-run` prints the cells
-without running anything.
+without running anything. Every invocation writes its cells under one new
+`runs/<timestamp>[_<label>]/` batch directory (see runtime/rollout.py's
+new_batch_dir) -- `--label` just makes that directory name readable.
 
 Grading is a separate command (grader/grade.py) that reads a run
 directory's final/ tree, so this file does not need to know about it."""
@@ -19,7 +21,7 @@ from pathlib import Path
 from runtime.config import load_runner, load_task
 from runtime.dotenv import load_dotenv
 from runtime.matrix import expand_grid
-from runtime.rollout import run_one_rollout
+from runtime.rollout import new_batch_dir, run_one_rollout
 
 
 def _load_project_env(start: Path) -> None:
@@ -56,6 +58,8 @@ def cmd_run_batch(args: argparse.Namespace) -> None:
         with print_lock:
             print(msg, flush=True)
 
+    batch_dir = new_batch_dir(runner_cfg.output_dir, args.label)
+
     def _one(idx: int) -> Path:
         cell = cells[idx]
         _say(f"[{idx + 1}/{n}] starting {cell.cell_id}")
@@ -66,6 +70,7 @@ def cmd_run_batch(args: argparse.Namespace) -> None:
                 cell=cell,
                 task_yaml_path=task_yaml,
                 runner_yaml_path=runner_yaml,
+                batch_dir=batch_dir,
             )
         except Exception as e:
             _say(f"[{idx + 1}/{n}] failed {cell.cell_id}: {type(e).__name__}: {e}")
@@ -73,6 +78,7 @@ def cmd_run_batch(args: argparse.Namespace) -> None:
         _say(f"[{idx + 1}/{n}] wrote {run_dir}")
         return run_dir
 
+    _say(f"batch: {batch_dir}")
     _say(f"running {n} rollout(s), concurrency={workers}")
     failures = 0
     with ThreadPoolExecutor(max_workers=workers) as ex:
@@ -99,6 +105,7 @@ def main(argv: list[str] | None = None) -> None:
     r.add_argument("--runner", default="runner.yaml")
     r.add_argument("--limit", type=int, default=None, help="Only run the first N cells.")
     r.add_argument("--dry-run", action="store_true", help="Print the expanded cells and exit.")
+    r.add_argument("--label", default=None, help="Appended to the batch dir's timestamp, e.g. 'vanilla-bounce'.")
     r.set_defaults(func=cmd_run_batch)
 
     args = p.parse_args(argv)

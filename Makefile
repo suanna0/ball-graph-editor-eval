@@ -4,6 +4,7 @@
 export PATH := $(HOME)/.docker/bin:$(PATH)
 
 LIMIT ?=
+LABEL ?=
 
 # `make viewer` renders the interactive viewer from any curves.json. It
 # defaults to a real extracted sample so the view can be worked on without
@@ -16,7 +17,7 @@ VIEWER_OUT ?= runs/viewer-sample.html
 help:
 	@echo "Targets:"
 	@echo "  make build                 Install Python/Node deps, Playwright's browser, pull the worker image."
-	@echo "  make run-batch [LIMIT=N]   Run the grid in runner.yaml (optionally capped to the first N cells)."
+	@echo "  make run-batch [LIMIT=N] [LABEL=name]   Run the grid in runner.yaml (optionally capped to the first N cells, batch dir named <timestamp>_<name>)."
 	@echo "  make dry-run               Print the expanded grid without running anything."
 	@echo "  make grade RUN=<run-dir>   Grade one rollout (extract + score). Add STUB=1 to use a stub rubric."
 	@echo "  make aggregate             Build the aggregate report over runs/."
@@ -32,7 +33,7 @@ build:
 	PATH="$$HOME/.docker/bin:$$PATH" docker pull node:20-bookworm-slim
 
 run-batch:
-	python3 -m runtime.cli run-batch $(if $(LIMIT),--limit $(LIMIT))
+	python3 -m runtime.cli run-batch $(if $(LIMIT),--limit $(LIMIT)) $(if $(LABEL),--label $(LABEL))
 
 dry-run:
 	python3 -m runtime.cli run-batch --dry-run

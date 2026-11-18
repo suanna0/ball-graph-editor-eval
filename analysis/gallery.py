@@ -79,9 +79,12 @@ def ensure_rendered(run: GradedRun) -> tuple[Path | None, Path | None, Path | No
     )
 
 
-def _row_html(run: GradedRun) -> str:
+def _row_html(run: GradedRun, runs_dir: Path) -> str:
     gif_path, graph_path, viewer_path = ensure_rendered(run)
-    rel = lambda p: p.relative_to(run.run_dir.parent).as_posix() if p else None  # noqa: E731
+    # Relative to runs_dir (where gallery.html itself lives), not
+    # run_dir.parent -- those differ now that a run_dir sits inside a
+    # batch dir rather than directly under runs_dir.
+    rel = lambda p: p.relative_to(runs_dir).as_posix() if p else None  # noqa: E731
     gif_rel, graph_rel, viewer_rel = rel(gif_path), rel(graph_path), rel(viewer_path)
     title = html.escape(f"{run.model} / {run.framework} / {run.material} / {run.feedback_mode} / seed {run.seed}")
     img_tags = []
@@ -106,7 +109,7 @@ def _row_html(run: GradedRun) -> str:
     )
 
 
-def build_gallery_html(runs: list[GradedRun], top: int) -> str:
+def build_gallery_html(runs: list[GradedRun], top: int, runs_dir: Path) -> str:
     ranked = sorted(runs, key=lambda r: r.total_score, reverse=True)
     best = ranked[:top]
     worst = list(reversed(ranked[-top:])) if len(ranked) > top else []
@@ -115,7 +118,7 @@ def build_gallery_html(runs: list[GradedRun], top: int) -> str:
     def section(title: str, items: list[GradedRun]) -> str:
         if not items:
             return f"<h2>{html.escape(title)}</h2><p><em>none</em></p>"
-        return f"<h2>{html.escape(title)}</h2>" + "".join(_row_html(r) for r in items)
+        return f"<h2>{html.escape(title)}</h2>" + "".join(_row_html(r, runs_dir) for r in items)
 
     body = (
         section(f"Best ({len(best)})", best)
@@ -137,7 +140,7 @@ def main() -> None:
 
     runs = load_runs(args.runs)
     out_path = args.runs / "gallery.html"
-    out_path.write_text(build_gallery_html(runs, args.top))
+    out_path.write_text(build_gallery_html(runs, args.top, args.runs))
     print(f"wrote {out_path}")
 
 

@@ -25,11 +25,13 @@ extractor/      TypeScript. Runtime curve extraction (Playwright-based for
                 CSS/WAA/GSAP, direct JSON parse for Lottie), the canonical
                 schema, graph-editor plot rendering, GIF rendering.
 grader/         Python. grade.py wires extraction to the rubric and writes
-                score.json. rubric.py and tolerances.yaml are intentionally
-                left for the project owner to author -- see below.
+                score.json. The checks in rubric.py/tolerances.yaml are the
+                project owner's own design -- see below.
 analysis/       Python. Aggregate report (bootstrap CIs) and the HTML
                 gallery over a runs/ directory.
-runs/           Gitignored. One self-contained directory per rollout.
+runs/           Gitignored. One <timestamp>[_<label>]/ batch directory per
+                `run-batch` invocation, each holding one self-contained
+                subdirectory per rollout cell.
 ```
 
 ## Quickstart
@@ -48,6 +50,14 @@ Widen the grid by editing `runner.yaml` (`worker.models`, `grid.frameworks`,
 `grid.materials`, `grid.feedback_modes`, `grid.seeds`) -- each combination
 becomes one rollout. The physical task itself (viewport, floor, ball size,
 time window) lives in `task/task.yaml` and is shared by every cell.
+
+Every `make run-batch` invocation writes its cells under one new
+`runs/<timestamp>[_<label>]/` batch directory, so a whole experiment's
+rollouts stay grouped together instead of one flat pile of every rollout
+ever run. Name it with `make run-batch LABEL=vanilla-bounce`; each cell
+inside gets its own clean subdirectory (`claude-sonnet-5_css_rubber_ball_blind_s01/`,
+no redundant per-cell timestamp). `make aggregate` and `make gallery` both
+scan `runs/` at any depth, so they see every batch at once.
 
 ## Canonical curve schema
 
