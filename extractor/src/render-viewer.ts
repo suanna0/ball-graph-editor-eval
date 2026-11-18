@@ -54,8 +54,10 @@ function embedJson(value: unknown): string {
   return JSON.stringify(value).replace(/</g, "\\u003c");
 }
 
-export function renderViewerHtml(curves: CanonicalCurveSet): string {
-  const title = `${curves.framework} rollout - curve viewer`;
+// runLabel identifies the rollout in the page title -- callers outside the
+// CLI (there are none yet) can omit it and fall back to the framework name.
+export function renderViewerHtml(curves: CanonicalCurveSet, runLabel?: string): string {
+  const title = `Curve Viewer - ${runLabel ?? curves.framework}`;
   // One card per channel that actually carries keys, so a stray channel
   // shows up as an extra column instead of hiding inside a shared plot.
   const activeProps = (["x", "y", "scaleX", "scaleY", "rotation"] as const)
@@ -129,7 +131,13 @@ export function renderViewerHtml(curves: CanonicalCurveSet): string {
               align-items: center; justify-content: center;
               padding: 32px; background: rgba(0, 0, 0, 0.55); }
   #lightbox.open { display: flex; }
-  #lightbox .pane { width: min(1100px, 92vw); height: min(820px, 92vh); }
+  /* #lightbox's own 32px padding (64px per axis) isn't implied by a bare
+     92vw/92vh -- without subtracting it, the pane's declared size can
+     exceed the flex container's content box on a narrow viewport, and
+     flexbox silently shrinks the pane to fit. That decouples the pane's
+     RENDERED size from what the plot math below assumes, which is what
+     let a tick label drift into the expand button's reserved corner. */
+  #lightbox .pane { width: min(1100px, calc(92vw - 64px)); height: min(820px, calc(92vh - 64px)); }
   /* The stage's height comes from its own width via a fixed aspect ratio
      (layoutStage), not from flex-grow like a graph's plot -- so forcing it
      to the same tall box as a graph pane would just leave dead space below
@@ -288,7 +296,13 @@ function layoutStage() {
 // fill whatever column width the grid gives them. Re-rendering at the
 // real pixel width (rather than scaling one SVG with a viewBox) keeps
 // label text at a true 11px instead of scaling it off the type ramp.
-const MIN_W = 280, MIN_H = 150, ML = 60, MR = 16, MT = 14, MB = 30;
+// MR reserves the expand button's own footprint (28px + its 8px offset)
+// in the plot's bottom-right corner. The rightmost time tick is drawn
+// with text-anchor="end" at x = ML + PLOT_W (W - MR), so its text only
+// ever extends LEFTWARD from that point -- as long as MR is at least the
+// button's width, the label can never reach under it, regardless of how
+// wide that label's text is.
+const MIN_W = 280, MIN_H = 150, ML = 60, MR = 36, MT = 14, MB = 30;
 const plotW = (w) => Math.max(w - ML - MR, 40);
 // The visible time window. Brushing a range on any graph narrows it for
 // ALL graphs, so the cards always share one time axis.
@@ -409,7 +423,13 @@ function buildGraph(prop, host, W, H) {
   for (const { v, step } of ticks(viewT0, viewT1, Math.max(2, Math.round(PLOT_W / 90)))) {
     const x = tToX(v);
     svg.appendChild(el("line", { x1: x, y1: top, x2: x, y2: top + LANE_H, stroke: "var(--line)" }));
-    const anchor = x <= ML + 2 ? "start" : x >= ML + PLOT_W - 2 ? "end" : "middle";
+    // A "middle" anchor draws half the label's width to either side of x,
+    // so a tick landing merely close to the right edge -- not just AT it --
+    // can still poke a label past the plot boundary (and into the expand
+    // button's reserved corner there). 24px safely covers a label's half
+    // width at this font size; "end" anchor only ever draws LEFTWARD from
+    // x, so switching this early can't itself cause an overflow.
+    const anchor = x <= ML + 2 ? "start" : x >= ML + PLOT_W - 24 ? "end" : "middle";
     const lab = el("text", { x, y: top + LANE_H + 16, fill: "var(--faint)", "text-anchor": anchor });
     lab.textContent = tickLabel(v, step, "s");
     svg.appendChild(lab);
@@ -545,6 +565,33 @@ function buildGraph(prop, host, W, H) {
   return ph;
 }
 
+// MR and the tick anchor threshold above keep a label's SVG-local position
+// clear of the expand button under normal sizing -- but the button is
+// positioned relative to the PANE, not the SVG, and at the extreme end of
+// the responsive range (a lightbox pane squeezed below MIN_W, say) the two
+// can decouple: the SVG renders at its floor width even though its real
+// container is narrower. Rather than extend the margin math to cover every
+// such case, check the one thing that actually matters -- the rendered
+// boxes, post-layout -- and hide whatever truly collides. This is the
+// backstop that holds even when the geometry assumptions above don't.
+//
+// Called every layoutGraphs() pass, not just when buildGraph reruns: a
+// resize can move the button (it's sized off the pane) without changing
+// the SVG's own clamped width, which would otherwise skip the rebuild
+// that this check used to ride along with and leave it stale.
+function hideLabelsUnderExpandButton(svg, host) {
+  const pane = host.closest(".pane");
+  const btn = pane && pane.querySelector(".expand-btn");
+  if (!btn) return;
+  const b = btn.getBoundingClientRect();
+  if (b.width === 0) return; // not laid out yet (e.g. display:none ancestor)
+  svg.querySelectorAll("text").forEach((t) => {
+    const r = t.getBoundingClientRect();
+    const overlaps = r.right > b.left && r.left < b.right && r.bottom > b.top && r.top < b.bottom;
+    t.style.visibility = overlaps ? "hidden" : "";
+  });
+}
+
 function rebuildAll() {
   for (const g of graphs) { g.width = 0; g.height = 0; }
   layoutGraphs();
@@ -573,6 +620,12 @@ function layoutGraphs() {
     g.width = w;
     g.height = h;
     g.ph = buildGraph(g.prop, g.host, w, h);
+  }
+  // Unconditional, even for graphs the loop above just skipped: the
+  // button can move on its own (it's sized off the pane, not the SVG).
+  for (const g of graphs) {
+    const svg = g.host.querySelector("svg");
+    if (svg) hideLabelsUnderExpandButton(svg, g.host);
   }
   draw(now);
 }
@@ -755,7 +808,15 @@ async function main() {
   }
   const fs = await import("node:fs");
   const curves: CanonicalCurveSet = JSON.parse(fs.readFileSync(curvesPath, "utf-8"));
-  fs.writeFileSync(outPath, renderViewerHtml(curves));
+  // Pipeline output always lands at <runDir>/extracted/curves.json -- use
+  // the run directory's own name there, since "curves" (the file's own
+  // basename) is the same for every run and tells you nothing. Ad-hoc
+  // sample/fixture files don't have that shape, so fall back to their
+  // own basename instead.
+  const runLabel = path.basename(path.dirname(curvesPath)) === "extracted"
+    ? path.basename(path.dirname(path.dirname(curvesPath)))
+    : path.basename(curvesPath, ".json");
+  fs.writeFileSync(outPath, renderViewerHtml(curves, runLabel));
 }
 
 const isMain = process.argv[1] && path.resolve(process.argv[1]) === path.resolve(new URL(import.meta.url).pathname);
