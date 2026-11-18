@@ -73,28 +73,30 @@ export function renderViewerHtml(curves: CanonicalCurveSet): string {
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>${title}</title>
-<link rel="preconnect" href="https://fonts.googleapis.com" />
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400&display=swap" />
 <style>
-  /* THREE COLORS. --ink carries every neutral -- text, curve, borders, the
-     floor line, panel fill -- at different alphas. --key marks keyframes,
-     and its handles, which belong to it. --playhead is the only other
-     hue. Nothing here may introduce a fourth: derive instead. */
+  /* Palette fixed to the given swatches, used literally rather than
+     derived tints -- the five neutrals read as one light-to-dark ramp
+     (surface/panel/line/faint/ink). --key (keyframes, their handles,
+     the ball) is the one red; --playhead is the one pale pink, and
+     --select aliases it rather than repeating the same hex, since a
+     selection wash is just that pink used for a different mark. */
   :root {
-    --ink: #1d2025;
-    --key: #2563eb;
-    --playhead: #dc2626;
-    --surface: #fff;
-    --panel: color-mix(in srgb, var(--ink) 4%, var(--surface));
-    --line: color-mix(in srgb, var(--ink) 16%, transparent);
-    --faint: color-mix(in srgb, var(--ink) 45%, transparent);
-    --select: color-mix(in srgb, var(--key) 18%, transparent);
+    --ink: #000000;
+    --key: #D13836;
+    --playhead: #F1B9C1;
+    --surface: #FCFCFC;
+    --panel: #F4F3F1;
+    --line: #CFCDCB;
+    --faint: #403C38;
+    --select: var(--playhead);
 
     /* ONE TYPE STYLE, set once on body. Everything inherits it, SVG text
        included, so no other rule names a font. Hierarchy comes from color,
-       case and position -- never size or weight. */
-    --type: 400 12px/1.5 "Inter", ui-sans-serif, system-ui, sans-serif;
+       case and position -- never size or weight. ui-rounded is a CSS Fonts
+       Level 4 generic family, not a webfont -- WebKit resolves it to SF Pro
+       Rounded on Apple platforms with no network request, and other
+       engines fall through to the system sans-serif stack. */
+    --type: 400 12px/1.5 ui-rounded, "SF Pro Rounded", ui-sans-serif, system-ui, sans-serif;
   }
   * { box-sizing: border-box; letter-spacing: 0; }
   /* Cards sit centred in the window. The "safe" keyword keeps the top
@@ -103,7 +105,7 @@ export function renderViewerHtml(curves: CanonicalCurveSet): string {
      lives inside a TS template literal and one would terminate it.) */
   body { margin: 0; padding: 32px; min-height: 100vh; display: flex; flex-direction: column;
          justify-content: center; justify-content: safe center;
-         font: var(--type); background: #eee; color: var(--ink); }
+         font: var(--type); background: var(--panel); color: var(--ink); }
   h2 { font: inherit; margin: 0; }
   button, input { font: inherit; color: inherit; }
 
@@ -112,7 +114,7 @@ export function renderViewerHtml(curves: CanonicalCurveSet): string {
   .panes { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
            grid-auto-rows: 1fr; gap: 16px; }
   .pane { position: relative; display: flex; flex-direction: column; min-width: 0; padding: 8px;
-          background: #fff; }
+          background: var(--surface); }
   .pane h2 { margin-bottom: 6px; color: var(--faint); text-align: center; }
 
   /* Sits over the card's own content, so it needs the surface fill behind
@@ -137,7 +139,6 @@ export function renderViewerHtml(curves: CanonicalCurveSet): string {
   #stage { position: relative; width: 100%; overflow: hidden;
            background: var(--surface); border: 1px solid var(--line); }
   #ball { position: absolute; border-radius: 50%; background: var(--key); }
-  #floorLine { position: absolute; left: 0; width: 100%; border-top: 2px solid var(--faint); }
 
   /* Right padding reserves the expand button's own corner (28px + its 8px
      offset) so the absolutely-positioned button doesn't sit on top of the
@@ -263,9 +264,6 @@ const ACTIVE = PROPS.filter((p) => (CURVES.properties[p] || []).length > 0);
 
 // ------------------------------------------------------------------- stage
 const stage = document.getElementById("stage");
-const floorLine = document.createElement("div");
-floorLine.id = "floorLine";
-stage.appendChild(floorLine);
 const ball = document.createElement("div");
 ball.id = "ball";
 stage.appendChild(ball);
@@ -278,7 +276,6 @@ function layoutStage() {
   if (!w) return;
   SCALE = w / VIEWPORT.width;
   stage.style.height = Math.round(VIEWPORT.height * SCALE) + "px";
-  floorLine.style.top = FLOOR_Y * SCALE + "px";
   ball.style.width = BALL_D * SCALE + "px";
   ball.style.height = BALL_D * SCALE + "px";
 }
@@ -457,7 +454,7 @@ function buildGraph(prop, host, W, H) {
       d += "L " + tToX(DURATION).toFixed(2) + " " + pv(last.value).toFixed(2) + " ";
     }
   }
-  if (d) marks.appendChild(el("path", { d, fill: "none", stroke: "var(--ink)", "stroke-width": 1.6 }));
+  if (d) marks.appendChild(el("path", { d, fill: "none", stroke: "var(--ink)", "stroke-width": 1.28 }));
 
   const keyPts = [];
   kfs.forEach((k, ki) => {
@@ -494,7 +491,7 @@ function buildGraph(prop, host, W, H) {
   // selection, and releasing zooms every graph to the time span those keys
   // cover. Hit-testing the box (rather than just its x range) means a key
   // that is in the right time range but far off in value is not dragged in.
-  const brush = el("rect", { fill: "var(--select)", stroke: "var(--key)",
+  const brush = el("rect", { fill: "var(--select)", "fill-opacity": 0.5, stroke: "var(--key)",
     "stroke-width": 1, "pointer-events": "none", visibility: "hidden" });
   svg.appendChild(brush);
   svg.style.cursor = "crosshair";
