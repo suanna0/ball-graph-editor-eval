@@ -1,3 +1,43 @@
-# Placeholder. The rubric (grader/rubric.py) is user-authored; this file
-# should hold every weight and tolerance it uses, each with a one-line
-# comment explaining the choice (per the eval brief). Empty until then.
+# Weights and tolerances for grader/rubric.py's score(). Every number a
+# check actually uses lives here, not hardcoded in rubric.py -- except
+# float-noise guards (e.g. a 1e-9 comparison epsilon), which aren't real
+# design choices and stay inline as code constants. One-line comment per
+# entry explaining the choice.
+
+# Checks 6 and 7 size their time tolerances in frames at this assumed rate
+# (see rubric.py's FRAME UNIT note: it's a human-friendly unit, not a claim
+# that submissions are frame-quantized).
+fps: 24
+
+# Points per check, matching the (N pts) tags in rubric.py's docstring.
+# 1-5 are the "does this look like a correct bounce" checks; 6-7 are
+# lower-weighted because they're polish/style, not shape correctness.
+weights:
+  contact_convex_hull: 8          # check 1
+  corner_at_contact_flat_apex: 8  # check 2
+  x_shape: 8                      # check 3
+  y_key_count: 8                  # check 4
+  no_stray_keys: 8                # check 5
+  settle_together: 5              # check 6
+  bounce_timing: 5                # check 7
+
+tolerances:
+  # check 2: an apex handle's dv must be within this of 0 to count as
+  # flat. Value-domain (px), not frame-based -- a slope epsilon, not a
+  # time one.
+  flat_apex_dv: 0.01
+  # check 2: minimum |slope_in - slope_out| at a contact to count as a
+  # corner rather than a smooth round-through. Deliberately tiny -- this
+  # is a float-noise guard, not a real "how sharp" threshold.
+  corner_slope_eps: 1.0e-6
+  # check 6: x's last keyframe and y's last keyframe must land within
+  # this many frames of each other.
+  settle_together_frames: 1
+  # check 7: the two gaps making up one bounce's half-period (g_2 vs g_3,
+  # etc.) must match within this many frames.
+  bounce_timing_pairing_frames: 1
+  # check 7: consecutive half-period decrements (d_i - d_(i+1)) must
+  # match each other within this many frames. Looser than the pairing
+  # tolerance since it's a difference of differences and errors compound
+  # across bounces -- midpoint of the 1.5-2 frame range discussed.
+  bounce_timing_diff_frames: 1.75
