@@ -10,33 +10,37 @@ effective because it is easy to spot when the animation looks wrong, and there
 are few enough moving parts that the exercise stays focused on reading the graph 
 editor.
 
-Each rollout gets a prompt rendered from `task/brief.md.j2`: the scene
-(viewport size, where the floor and the ball's starting position are, how
-long the animation has to finish) the material it's animating, and the 
+Each rollout receives prompt `task/brief.md.j2`: the scene
+(viewport size, duration, start and end position) the ball's material, and the 
 constraints (keyframes and easing only, no physics-simulation loop). It also 
-gets framework-specific instructions for which file to edit and how (a CSS 
-`@keyframes` rule, a GSAP timeline, or a Lottie `ks.p` property, depending 
-on the cell). 
+gets instructions for which file to edit and how, depending on the cell:
+
+| Framework | File edited       | Motion API                | Position properties | Easing format              |
+|-----------|--------------------|---------------------------|----------------------|----------------------------|
+| CSS       | `style.css`        | `@keyframes` rule         | `transform: translateX/Y` | `animation-timing-function` (cubic-bezier) |
+| GSAP      | `animation.js`     | `gsap.to` / `gsap.timeline` | `x` / `y`            | named eases (`"power2.out"`) or custom |
+| Lottie    | `animation.json`   | direct JSON edit (Bodymovin format) | `ks.p` (position)    | `i`/`o` bezier tangents    |
+
+
+
 
 Tools: `read_file`, `write_file`, `list_dir`, `bash`, `finish`, and
-`render_graph` -- a live preview of its own current keyframes/handles as
-a graph-editor plot, plus a filmstrip of stills showing how the animation
-looks. 
+`render_graph`, a preview of keyframes/handles as
+a graph plot and a filmstrip of stills. 
 
 ## Rubric
 
-After the rollout ends, `grader/grade.py` re-extracts curves from a
+Once the worker finishes, `grader/grade.py` re-extracts curves from a
 frozen snapshot of the worker's final files and calls `grader/rubric.py`'s
-`score()`, which runs 7 checks against the curve shape, for a score out
-of 50 (full spec, including tolerances, in `rubric.py`'s own docstring):
+`score()`, which runs 7 checks for a score out of 50 points:
 
-1. Contacts don't bulge past their tangent handles (convex-hull bound) -- 8 pts
-2. Contacts are a sharp corner, apexes a smooth crest -- 8 pts
-3. X motion is linear or ease-out (monotonic, non-increasing velocity) -- 8 pts
-4. Exact Y-keyframe count -- every key is a real contact or apex, no excess -- 8 pts
-5. No stray keys on unused channels (scale/rotation) -- 8 pts
-6. X and Y settle on the same frame -- 5 pts
-7. Bounce timing decelerates at a constant rate (not physical, not uniform) -- 5 pts
+1. At a given contact point, the ball's path does not bulge past its handlebars (8 pts)
+2. Contact points have broken tangents and apexes are smooth (8 pts)
+3. Translate X is linear or subtle ease-out (monotonic, non-increasing velocity) (8 pts)
+4. Every Y key is either a contact or apex, no unnecessary keys (8 pts)
+5. No stray keys on unused channels (scale/rotation) (8 pts)
+6. X and Y finish at the same frame (5 pts)
+7. The time of each bounce decreases at a constant rate (5 pts)
 
 The rubric items are adapted from this tutorial by Moshe Mahler 
 (https://vimeo.com/423284703?fl=pl&fe=vl).
