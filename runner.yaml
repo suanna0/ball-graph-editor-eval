@@ -4,7 +4,7 @@
 worker:
   provider: anthropic
   models:
-    - claude-sonnet-5
+    - claude-opus-5
 
   # Sonnet 5 removed the fixed thinking budget: {type: enabled, budget_tokens: N}
   # returns a 400. Adaptive is the only on-mode -- Claude decides how much to
@@ -21,7 +21,14 @@ worker:
   output_config:
     effort: high
 
-  max_tokens: 8192
+  # Per-API-call ceiling (separate from task.yaml's max_output_tokens,
+  # a cumulative budget checked after each turn). With adaptive thinking
+  # and effort=high, a single turn's thinking alone can exceed several
+  # thousand tokens before any actual response -- 8192 was observed
+  # truncating turn 2 mid-thinking (stop_reason=max_tokens) on
+  # 2026-11-19, ending the rollout with nothing written, since
+  # runtime/agent.py treats any non-tool_use stop_reason as terminal.
+  max_tokens: 32000
 
 # Which slice of task.yaml's frameworks/materials/feedback_modes to run,
 # and how many repeats (seeds) per cell. Must be subsets of task.yaml.

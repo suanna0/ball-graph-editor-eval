@@ -77,7 +77,14 @@ def run_agent(
             req["output_config"] = output_config
 
         event_log.log("model_request", turn=turns)
-        resp = client.messages.create(**req)
+        # Streaming, not a plain create() call: once max_tokens is large
+        # enough that a request could plausibly run past 10 minutes (true
+        # here, with adaptive thinking at high effort), the SDK requires
+        # streaming and raises otherwise. get_final_message() still
+        # returns the same assembled Message shape .create() would, so
+        # nothing below this line needs to change.
+        with client.messages.stream(**req) as stream:
+            resp = stream.get_final_message()
 
         for k in usage_totals:
             usage_totals[k] += getattr(resp.usage, k, 0) or 0

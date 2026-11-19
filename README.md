@@ -1,7 +1,7 @@
 # Ball Bounce Eval
 
 A ball bounce is a beginner animation exercise that teaches students how to read 
-and modify the graph editor to create appealing animations. This exercise is 
+and modify the graph editor to creaidkte appealing animations. This exercise is 
 effective because it is easy to spot when the animation looks wrong, and there 
 are few enough moving parts that the exercise stays focused on reading the graph 
 editor.
@@ -9,6 +9,14 @@ editor.
 This evaluation environment compares how well different AI models animate a ball 
 bounce by inspecting keyframes and bezier curves in a reconstructed graph 
 instead of only grading the visual output.
+
+**Why can't we use a physics simulation?**
+
+In animation, character movement doesn't always have to follow the rules
+of physics. Balls travel in parabolic paths, but a half-circle arc could
+look more appealing for a simplified cartoon. Another example: in real
+life, a ball's bounce height decays exponentially, while a simple linear
+decay usually reads as realistic enough to the human eye.
 
 Each rollout receives prompt `task/brief.md.j2`: the scene
 (viewport size, duration, start and end position) the ball's material, and the 
