@@ -26,7 +26,7 @@ gets instructions for which file to edit and how, depending on the cell:
 
 Tools: `read_file`, `write_file`, `list_dir`, `bash`, `finish`, and
 `render_graph`, a preview of keyframes/handles as
-a graph plot and a filmstrip of stills. 
+a graph plot and a filmstrip of stills 
 
 ## Rubric
 
