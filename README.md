@@ -14,9 +14,9 @@ instead of only grading the visual output.
 
 In animation, character movement doesn't always have to follow the rules
 of physics. Balls travel in parabolic paths, but a half-circle arc could
-look more appealing for a simplified cartoon. Another example: in real
-life, a ball's bounce height decays exponentially, while a simple linear
-decay usually reads as realistic enough to the human eye.
+look more appealing for a simplified cartoon. Another example of a simplification
+is the ball's height decay over time. In real life, a ball's bounce height decays 
+exponentially, while a linear decay looks good enough to the human eye.
 
 Each rollout receives prompt `task/brief.md.j2`: the scene
 (viewport size, duration, start and end position) the ball's material, and the 
