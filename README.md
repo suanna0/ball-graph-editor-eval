@@ -1,14 +1,14 @@
 # Ball Bounce Eval
 
-This evaluation environment compares how well different AI models animate a ball 
-bounce by inspecting keyframes and bezier curves in a reconstructed graph 
-instead of only grading the visual output.
-
 A ball bounce is a beginner animation exercise that teaches students how to read 
 and modify the graph editor to create appealing animations. This exercise is 
 effective because it is easy to spot when the animation looks wrong, and there 
 are few enough moving parts that the exercise stays focused on reading the graph 
 editor.
+
+This evaluation environment compares how well different AI models animate a ball 
+bounce by inspecting keyframes and bezier curves in a reconstructed graph 
+instead of only grading the visual output.
 
 Each rollout receives prompt `task/brief.md.j2`: the scene
 (viewport size, duration, start and end position) the ball's material, and the 
@@ -43,7 +43,7 @@ frozen snapshot of the worker's final files and calls `grader/rubric.py`'s
 7. The time of each bounce decreases at a constant rate (5 pts)
 
 The rubric items are adapted from this tutorial by Moshe Mahler 
-(https://vimeo.com/423284703?fl=pl&fe=vl).
+(https://vimeo.com/423284703?fl=pl&fe=vl)
 
 ## Repo layout
 
