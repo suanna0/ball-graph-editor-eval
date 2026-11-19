@@ -23,11 +23,23 @@ Tools: `read_file`, `write_file`, `list_dir`, `bash`, `finish`, and
 a graph-editor plot, plus a filmstrip of stills showing how the animation
 looks. 
 
-## Rubric 
+## Rubric
 
 After the rollout ends, `grader/grade.py` re-extracts curves from a
 frozen snapshot of the worker's final files and calls `grader/rubric.py`'s
-`score()`, which runs 7 checks against the curve shape. 
+`score()`, which runs 7 checks against the curve shape, for a score out
+of 50 (full spec, including tolerances, in `rubric.py`'s own docstring):
+
+1. Contacts don't bulge past their tangent handles (convex-hull bound) -- 8 pts
+2. Contacts are a sharp corner, apexes a smooth crest -- 8 pts
+3. X motion is linear or ease-out (monotonic, non-increasing velocity) -- 8 pts
+4. Exact Y-keyframe count -- every key is a real contact or apex, no excess -- 8 pts
+5. No stray keys on unused channels (scale/rotation) -- 8 pts
+6. X and Y settle on the same frame -- 5 pts
+7. Bounce timing decelerates at a constant rate (not physical, not uniform) -- 5 pts
+
+The rubric items are adapted from this tutorial by Moshe Mahler 
+(https://vimeo.com/423284703?fl=pl&fe=vl).
 
 ## Repo layout
 
