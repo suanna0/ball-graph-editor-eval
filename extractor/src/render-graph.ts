@@ -1,10 +1,13 @@
 // Renders a CanonicalCurveSet as a graph-editor style plot: one lane per
 // property (x, y, scaleX, scaleY, rotation), each showing its keyframes as
-// dots and its Bezier handles as short line segments -- the same visual
-// grammar as the handle view in a graph editor. Used both by the worker-
-// facing `render_graph` tool (preview only) and by the final per-rollout
-// artifact renderer (M7/analysis). Rasterization goes through Playwright
-// (same dependency extraction already needs) rather than a native canvas
+// dots, the REAL cubic Bezier curve between them (not a polyline -- see
+// controlPoints() below), and the handles as short tangent-direction
+// stubs -- the same visual grammar as a real graph editor. Used both by
+// the worker-facing `render_graph` tool (so the worker can actually see
+// whether its own curve has a sharp corner or bulges through a contact,
+// the same thing the rubric judges) and by the final per-rollout artifact
+// renderer (M7/analysis). Rasterization goes through Playwright (same
+// dependency extraction already needs) rather than a native canvas
 // library.
 import path from "node:path";
 
@@ -45,6 +48,19 @@ function laneBounds(kfs: Keyframe[]): [number, number] {
   return [min - pad, max + pad];
 }
 
+/** The 4 absolute control points for the cubic Bezier segment a->b -- same
+ * formula as grader/rubric.py's _control_points and render-viewer.ts's
+ * controlPoints, so all three agree on what the curve actually looks like. */
+function controlPoints(a: Keyframe, b: Keyframe): [[number, number], [number, number], [number, number], [number, number]] | null {
+  if (!a.outHandle || !b.inHandle) return null;
+  return [
+    [a.time, a.value],
+    [a.time + a.outHandle.dt, a.value + a.outHandle.dv],
+    [b.time + b.inHandle.dt, b.value + b.inHandle.dv],
+    [b.time, b.value],
+  ];
+}
+
 export function renderGraphSvg(curves: CanonicalCurveSet): string {
   const plotWidth = WIDTH - MARGIN_LEFT - MARGIN_RIGHT;
   const duration = Math.max(curves.durationSeconds, 0.001);
@@ -64,8 +80,23 @@ export function renderGraphSvg(curves: CanonicalCurveSet): string {
     ];
 
     if (kfs.length > 0) {
-      const pathD = kfs.map((k, i) => `${i === 0 ? "M" : "L"} ${tToX(k.time).toFixed(1)} ${vToY(k.value).toFixed(1)}`).join(" ");
-      parts.push(`<path d="${pathD}" fill="none" stroke="#999" stroke-width="1" />`);
+      let pathD = `M ${tToX(kfs[0].time).toFixed(1)} ${vToY(kfs[0].value).toFixed(1)}`;
+      for (let i = 0; i < kfs.length - 1; i++) {
+        const cp = controlPoints(kfs[i], kfs[i + 1]);
+        const b = kfs[i + 1];
+        if (cp) {
+          const [, p1, p2, p3] = cp;
+          pathD += ` C ${tToX(p1[0]).toFixed(1)} ${vToY(p1[1]).toFixed(1)}, ` +
+            `${tToX(p2[0]).toFixed(1)} ${vToY(p2[1]).toFixed(1)}, ` +
+            `${tToX(p3[0]).toFixed(1)} ${vToY(p3[1]).toFixed(1)}`;
+        } else {
+          // A missing handle on either side means there's no curve data
+          // for this segment -- a straight line says so honestly, rather
+          // than silently drawing a smooth curve that isn't really there.
+          pathD += ` L ${tToX(b.time).toFixed(1)} ${vToY(b.value).toFixed(1)}`;
+        }
+      }
+      parts.push(`<path d="${pathD}" fill="none" stroke="#333" stroke-width="1.5" />`);
 
       for (const k of kfs) {
         const px = tToX(k.time);

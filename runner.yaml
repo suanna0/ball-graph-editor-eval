@@ -28,7 +28,7 @@ worker:
 grid:
   frameworks: [css]
   materials: [rubber_ball]
-  feedback_modes: [blind]
+  feedback_modes: [full_feedback]
   seeds: 1
 
 batch:

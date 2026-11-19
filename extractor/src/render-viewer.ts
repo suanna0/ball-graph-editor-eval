@@ -4,9 +4,12 @@
 // page never loads the worker's page or any rendered video, so curves.json
 // is the single piece of state a rollout's visualization needs.
 //
-// Unlike render-graph.ts, which polylines between keyframes, this draws the
-// real cubic Bezier segments, so curve SHAPE (sharp V at a contact vs. a
-// rounded one) is actually visible -- which is what the rubric judges.
+// render-graph.ts draws the same real cubic Bezier segments (so curve
+// SHAPE -- sharp V at a contact vs. a rounded one, what the rubric judges
+// -- is visible there too, including to the worker via the render_graph
+// tool); this adds the reconstructed stage/playback and interactive
+// zoom/scrub on top, for a human inspecting a rollout rather than the
+// worker mid-rollout.
 //
 // Playback is a reconstruction, not ground truth. If the extractor
 // misreads a framework's easing, this viewer will faithfully show the

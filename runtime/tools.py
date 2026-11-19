@@ -1,24 +1,32 @@
 """Tool specs sent to the model, and the host-side bridge that runs them
 against the sandbox.
 
-`render_graph` is the optional worker-facing preview tool for the
-`can_render_and_view_graph` feedback mode. It shells out to the *same*
-extractor code the grader uses, but against the worker's live files in its
-own sandbox -- a preview aid only. It never writes anything the grader
-later trusts: the official grade always re-extracts from scratch against
-the frozen `final/` snapshot after the rollout ends (see runtime/rollout.py
-and grader/grade.py), so nothing this tool does can influence the score.
+`render_graph` is the worker-facing preview tool. It shells out to the
+*same* extractor code the grader uses, but against the worker's live files
+in its own sandbox -- a preview aid only. It returns two things together,
+the way a human animator would see both at once: the graph-editor plot
+(curve shape, from the same extraction the grader uses) and a filmstrip of
+a few stills showing how the animation actually looks across its
+duration (there's no way to hand the model something it can actually
+play, so evenly-spaced frames stand in for real playback). It never
+writes anything the grader later trusts: the official grade always
+re-extracts from scratch against the frozen `final/` snapshot after the
+rollout ends (see runtime/rollout.py and grader/grade.py), so nothing this
+tool does can influence the score.
 """
 from __future__ import annotations
 
 import base64
+import json
 import subprocess
 from pathlib import Path
 
 _MAX_READ_BYTES = 200_000
 _MAX_BASH_OUT = 16_000
 _DEFAULT_BASH_TIMEOUT = 120
-_RENDER_GRAPH_TIMEOUT = 60
+# Now launches 3 separate browser instances (extraction, graph-plot
+# rendering, filmstrip scrubbing), not 1 -- more startup/work than before.
+_RENDER_GRAPH_TIMEOUT = 90
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 _RENDER_GRAPH_TOOL_SCRIPT = _REPO_ROOT / "extractor" / "src" / "render-graph-tool.ts"
@@ -72,10 +80,12 @@ _ALL_SPECS: dict[str, dict] = {
     "render_graph": {
         "name": "render_graph",
         "description": (
-            "Render your current animation's keyframes and Bezier handles as a "
-            "graph-editor style plot (one lane per property: x, y, scaleX, scaleY, "
-            "rotation) and return it as an image so you can inspect your curves. "
-            "This does not render the animation itself, only the curve shapes."
+            "See your current work in progress, the way you would in a real "
+            "animation tool: a graph-editor style plot of your keyframes and "
+            "Bezier handles (one lane per property: x, y, scaleX, scaleY, "
+            "rotation), AND a filmstrip of a few stills showing how the "
+            "animation actually looks across its duration. Use this to check "
+            "both the curve shape and the visual result before calling finish."
         ),
         "input_schema": {"type": "object", "properties": {}},
     },
@@ -189,8 +199,17 @@ class ToolBridge:
             return "render_graph timed out; keep working and try again later"
         if proc.returncode != 0:
             return f"render_graph failed:\n{proc.stderr[-2000:]}"
-        b64 = proc.stdout.strip()
-        return [{
-            "type": "image",
-            "source": {"type": "base64", "media_type": "image/png", "data": b64},
-        }]
+        payload = json.loads(proc.stdout)
+
+        def _image(b64: str) -> dict:
+            return {"type": "image", "source": {"type": "base64", "media_type": "image/png", "data": b64}}
+
+        blocks: list[dict] = [
+            {"type": "text", "text": "Graph-editor plot of your current keyframes and handles:"},
+            _image(payload["graph"]),
+            {"type": "text", "text": "How it actually looks, rendered at a few points across the animation:"},
+        ]
+        for frame in payload["frames"]:
+            blocks.append({"type": "text", "text": f"t={frame['t']:.2f}s"})
+            blocks.append(_image(frame["png"]))
+        return blocks

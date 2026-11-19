@@ -1,17 +1,33 @@
 # Ball Bounce Eval
 
-An eval harness that has AI models author a bouncing-ball animation from
-scratch — keyframes and Bezier handles, no physics simulation loop — then
-grades the resulting *curves*, not pixels. Compares models and animation
-authoring frameworks (CSS `@keyframes`, GSAP, Lottie to start; Web
-Animations API, Motion, and a Three.js render target are planned but not
-wired in yet).
+This evaluation environment compares how well different AI models animate a ball 
+bounce by inspecting keyframes and bezier curves in a reconstructed graph 
+instead of only grading the visual output.
 
-The runtime architecture (one Docker container per rollout, an
-Anthropic-SDK agent loop, self-contained rollout records, deterministic
-grading over a frozen final snapshot, N-way concurrency) is adapted from a
-prior project, *Taste RL Env*. See `/Users/suannazhong/.claude/plans/giggly-dreaming-crystal.md`
-for the original design plan.
+A ball bounce is a beginner animation exercise that teaches students how to read 
+and modify the graph editor to create appealing animations. This exercise is 
+effective because it is easy to spot when the animation looks wrong, and there 
+are few enough moving parts that the exercise stays focused on reading the graph 
+editor.
+
+Each rollout gets a prompt rendered from `task/brief.md.j2`: the scene
+(viewport size, where the floor and the ball's starting position are, how
+long the animation has to finish) the material it's animating, and the 
+constraints (keyframes and easing only, no physics-simulation loop). It also 
+gets framework-specific instructions for which file to edit and how (a CSS 
+`@keyframes` rule, a GSAP timeline, or a Lottie `ks.p` property, depending 
+on the cell). 
+
+Tools: `read_file`, `write_file`, `list_dir`, `bash`, `finish`, and
+`render_graph` -- a live preview of its own current keyframes/handles as
+a graph-editor plot, plus a filmstrip of stills showing how the animation
+looks. 
+
+## Rubric 
+
+After the rollout ends, `grader/grade.py` re-extracts curves from a
+frozen snapshot of the worker's final files and calls `grader/rubric.py`'s
+`score()`, which runs 7 checks against the curve shape. 
 
 ## Repo layout
 
@@ -30,8 +46,8 @@ grader/         Python. grade.py wires extraction to the rubric and writes
 analysis/       Python. Aggregate report (bootstrap CIs) and the HTML
                 gallery over a runs/ directory.
 runs/           Gitignored. One <timestamp>[_<label>]/ batch directory per
-                `run-batch` invocation, each holding one self-contained
-                subdirectory per rollout cell.
+                `run-batch` invocation, each holding one subdirectory per
+                rollout cell.
 ```
 
 ## Quickstart
@@ -39,36 +55,27 @@ runs/           Gitignored. One <timestamp>[_<label>]/ batch directory per
 ```bash
 cp .env.example .env   # fill in ANTHROPIC_API_KEY
 make build
-make dry-run                    # see which cells runner.yaml's grid expands to
-make run-batch LIMIT=1          # run just the first cell as a smoke test
-make grade RUN=<printed run dir> STUB=1   # score it with a stub rubric
+make dry-run                              # see which cells runner.yaml's grid expands to
+make run-batch LIMIT=1 LABEL=smoke-test   # run just the first cell
+make grade RUN=<printed run dir>          # extract + score (add STUB=1 for a stub rubric)
 make aggregate
-make gallery                    # writes runs/gallery.html
+make gallery                              # writes runs/gallery.html
 ```
 
 Widen the grid by editing `runner.yaml` (`worker.models`, `grid.frameworks`,
-`grid.materials`, `grid.feedback_modes`, `grid.seeds`) -- each combination
-becomes one rollout. The physical task itself (viewport, floor, ball size,
-time window) lives in `task/task.yaml` and is shared by every cell.
-
-Every `make run-batch` invocation writes its cells under one new
-`runs/<timestamp>[_<label>]/` batch directory, so a whole experiment's
-rollouts stay grouped together instead of one flat pile of every rollout
-ever run. Name it with `make run-batch LABEL=vanilla-bounce`; each cell
-inside gets its own clean subdirectory (`claude-sonnet-5_css_rubber_ball_blind_s01/`,
-no redundant per-cell timestamp). `make aggregate` and `make gallery` both
-scan `runs/` at any depth, so they see every batch at once.
+`grid.materials`, `grid.feedback_modes`, `grid.seeds`); the physical task
+itself (viewport, floor, ball size, time window) lives in `task/task.yaml`
+and is shared by every cell. `aggregate`/`gallery` scan all of `runs/`
+regardless of batch nesting.
 
 ## Canonical curve schema
 
 Every adapter (`extractor/src/adapters/{domAnimations,gsap,lottie}.ts`)
 converts whatever the worker authored into one framework-agnostic shape --
-see `extractor/src/schema.ts`. Units are absolute (px for x/y, a ratio for
-scale, degrees for rotation); handles are stored relative to their own
-keyframe (`{dt, dv}`), not as normalized bezier control points, so a CSS
+see `extractor/src/schema.ts`. Handles are stored relative to their own
+keyframe (`{dt, dv}`), not normalized bezier control points, so a CSS
 `cubic-bezier(...)`, a GSAP named ease, and Lottie's own `i`/`o` tangents
-are all directly comparable to an ideal-parabola handle without
-re-deriving per-segment scale factors downstream.
+are all directly comparable without re-deriving per-segment scale factors.
 
 ```jsonc
 {
@@ -84,53 +91,17 @@ re-deriving per-segment scale factors downstream.
 ```
 
 `extractor/tests/extract.spec.ts` runs each adapter against a hand-built
-fixture page (not LLM output) with known keyframes, asserting the exact
-expected values and handle shapes -- run with `npx vitest run`.
+fixture page with known keyframes -- run with `npx vitest run`.
 
-### Per-framework notes
-
-- **CSS / WAA / Motion**: `document.getAnimations()[].effect.getKeyframes()`
-  returns the *authored* `transform` string per offset (not an
-  interpolated matrix), so there's no constraint on how the worker writes
-  the transform -- it's regex-parsed for `translate(X/Y)`,
-  `scale(X/Y)`, `rotate`.
-- **GSAP**: `extractor/src/adapters/gsap.ts` injects a wrapper around
-  `window.gsap`'s `to`/`timeline` *before* the page's own script runs (via
-  `page.addInitScript`), so it can only patch a **global** -- the GSAP
-  scaffold loads gsap from a pinned CDN `<script>` tag, not a bundled ESM
-  import. That wrapper script is written as a plain-JS string rather than
-  an actual TS function; see the comment at the top of that file for why
-  (short version: Playwright serializes injected functions via
-  `.toString()`, and esbuild's "keep names" pass adds a `__name()` helper
-  call that doesn't exist in the browser).
-- **Lottie**: pure JSON parse, no browser needed. Lottie's `o`
-  (outTangent)/`i` (inTangent) are already segment-relative normalized
-  bezier control points in the same shape as a CSS `cubic-bezier`.
-
-## The `render_graph` tool and why it can't affect grading
-
-`feedback_modes.can_render_and_view_graph` in `task/task.yaml` gives the
-worker a `render_graph` tool (`runtime/tools.py`) that runs the same
-extractor against its *own current files* and returns a graph-editor plot
-image -- a preview aid, nothing else. The official grade is always
-computed from scratch, in a separate process, against the **frozen
-`final/` snapshot** taken after the rollout ends (`runtime/rollout.py` ->
-`grader/grade.py`); the grader never reads anything the worker wrote
-claiming to be its curves, so nothing done through that tool can influence
-the score.
-
-## The rubric is the project owner's design
-
-The 7 graph-editor checks (weights, tolerances, the arithmetic
-bounce-timing rule, all of it) in `grader/rubric.py`'s docstring are the
-project owner's own design, built up over several sessions -- see the
-module docstring there for the full spec. `grade.py` is written against a
-fixed interface (`score(curves: dict) -> {"score": float, "checks":
-{...}}`), so the rest of the pipeline -- extraction, the fixture/test
-scaffold, aggregation, the gallery -- was built and tested independently of
-the rubric with `python -m grader.grade <run-dir> --stub-rubric`, and that
-flag still works if you want to exercise the pipeline without the real
-checks.
+**Per-framework notes:** CSS/WAA/Motion all read via
+`document.getAnimations()[].effect.getKeyframes()`, which returns the
+*authored* transform string per offset, so it's just regex-parsed for
+`translate`/`scale`/`rotate`. GSAP is extracted by injecting a wrapper
+around the global `window.gsap` before the page's own script runs (it has
+to be plain-JS source, not a serialized TS function -- see the comment at
+the top of `gsap.ts`). Lottie needs no browser at all: its `i`/`o`
+tangents are already segment-relative normalized bezier controls, same
+shape as a CSS `cubic-bezier`.
 
 ## Testing
 
@@ -138,25 +109,3 @@ checks.
 make typecheck     # tsc --noEmit over extractor/
 make test          # vitest (extractor) + pytest (grader scaffold)
 ```
-
-## Deferred (not in this pass)
-
-Three.js render target, Web Animations API / Motion frameworks beyond
-CSS+GSAP+Lottie, and a taste/preference layer (pairwise human preference +
-VLM judge).
-
-**Scope (2026-11-18):** `runner.yaml`'s grid currently runs a single
-material (`rubber_ball`) rather than the full `task.yaml` materials list
-(`beach_ball`, `bowling_ball`, `ping_pong_ball` are still defined there but
-unused). This experiment is scoped to a plain/vanilla bounce -- can the
-agent build a correct keyframed bounce at all -- rather than
-material-appropriate bounce *character* (a beach ball hanging in the air
-longer, a bowling ball barely bouncing), which the current rubric doesn't
-differentiate for. Two natural follow-on experiments, not started:
-
-- **Stylized/material-specific bounces.** Widen `grid.materials` and
-  extend the rubric to judge bounce character per material, rather than
-  one universal shape/timing rule for all three.
-- **Obstacle course.** A scene with more than a floor -- walls, ramps,
-  moving obstacles -- which would need a new task brief and a rubric built
-  for it from scratch, not an extension of this one.

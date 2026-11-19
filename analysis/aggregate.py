@@ -3,10 +3,8 @@
     python -m analysis.aggregate [--runs ./runs] [--out report.json]
 
 Prints (and optionally writes) scores grouped by model x framework x
-feedback_mode with paired-bootstrap 95% CIs over seeds, a preset-vs-
-hand-placed breakdown, and pairwise blind-vs-can_render_and_view_graph
-deltas (paired by seed) where both exist for the same model x framework x
-material.
+feedback_mode with paired-bootstrap 95% CIs over seeds, and a
+preset-vs-hand-placed breakdown.
 """
 from __future__ import annotations
 
@@ -16,7 +14,7 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Any
 
-from analysis.bootstrap import bootstrap_ci, paired_bootstrap_diff_ci
+from analysis.bootstrap import bootstrap_ci
 from analysis.load import GradedRun, load_runs
 
 
@@ -64,39 +62,12 @@ def preset_vs_hand_placed(runs: list[GradedRun]) -> list[dict[str, Any]]:
     return rows
 
 
-def feedback_deltas(runs: list[GradedRun]) -> list[dict[str, Any]]:
-    """blind vs can_render_and_view_graph, paired by seed, within each
-    (model, framework, material)."""
-    rows = []
-    for key, group in sorted(group_by(runs, "model", "framework", "material").items()):
-        model, framework, material = key
-        blind = {r.seed: r.total_score for r in group if r.feedback_mode == "blind"}
-        graph = {r.seed: r.total_score for r in group if r.feedback_mode == "can_render_and_view_graph"}
-        common_seeds = sorted(set(blind) & set(graph))
-        if not common_seeds:
-            continue
-        a = [graph[s] for s in common_seeds]
-        b = [blind[s] for s in common_seeds]
-        diff, lo, hi = paired_bootstrap_diff_ci(a, b)
-        rows.append({
-            "model": model,
-            "framework": framework,
-            "material": material,
-            "n_paired_seeds": len(common_seeds),
-            "mean_delta_graph_minus_blind": diff,
-            "ci95_lo": lo,
-            "ci95_hi": hi,
-        })
-    return rows
-
-
 def build_report(runs_dir: Path) -> dict[str, Any]:
     runs = load_runs(runs_dir)
     return {
         "n_runs": len(runs),
         "by_model_framework_feedback": scores_by_model_framework_feedback(runs),
         "preset_vs_hand_placed": preset_vs_hand_placed(runs),
-        "feedback_deltas_graph_minus_blind": feedback_deltas(runs),
     }
 
 

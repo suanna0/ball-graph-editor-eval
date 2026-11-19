@@ -39,13 +39,14 @@ materials:
   - beach_ball
   - ping_pong_ball
 
-# What tools the worker has, per feedback condition. render_graph renders
-# ONLY a plot of the current keyframes/handles -- never the animation
-# itself, and never anything the grader later trusts (see runtime/tools.py).
+# What tools the worker has. The worker always gets render_graph -- a
+# human animator isn't blindfolded, so neither is this one (removed
+# 2026-11-18; see git history for the earlier blind/can_render_and_view_graph
+# split). render_graph returns both a graph-editor plot AND a filmstrip of
+# a few stills of how the animation actually looks -- never anything the
+# grader later trusts (see runtime/tools.py).
 feedback_modes:
-  blind:
-    tools: [read_file, write_file, list_dir, bash, finish]
-  can_render_and_view_graph:
+  full_feedback:
     tools: [read_file, write_file, list_dir, bash, render_graph, finish]
 
 # Per-rollout limits. Uniform across models and frameworks.

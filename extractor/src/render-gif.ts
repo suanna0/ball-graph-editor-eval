@@ -17,35 +17,7 @@ import { chromium } from "playwright";
 
 import type { Framework } from "./schema.js";
 import { installGsapRecorder } from "./adapters/gsap.js";
-
-async function scrubTo(page: import("playwright").Page, framework: Framework, t: number, fps: number) {
-  if (framework === "gsap") {
-    await page.evaluate((tt: number) => {
-      const g = (window as any).gsap;
-      if (!g) return;
-      g.globalTimeline.pause();
-      g.globalTimeline.time(tt, false);
-    }, t);
-    return;
-  }
-  if (framework === "lottie") {
-    await page.evaluate(
-      ({ tt, ffps }: { tt: number; ffps: number }) => {
-        const anims = (window as any).lottie?.getRegisteredAnimations?.() ?? [];
-        for (const a of anims) a.goToAndStop(tt * ffps, true);
-      },
-      { tt: t, ffps: fps },
-    );
-    return;
-  }
-  // css / waa / motion
-  await page.evaluate((tt: number) => {
-    for (const a of document.getAnimations()) {
-      a.pause();
-      a.currentTime = tt * 1000;
-    }
-  }, t);
-}
+import { scrubTo } from "./filmstrip.js";
 
 export async function renderGif(
   siteDir: string,

@@ -54,6 +54,9 @@ believable for that material.
 
 You have `read_file`, `write_file`, `list_dir`, `bash`, and `finish`.
 {%- if has_render_graph %}
-You also have `render_graph`, which renders your current keyframes and
-Bezier handles as a graph-editor style plot so you can inspect your curves.
+You also have `render_graph`, which shows you your work in progress the
+way you'd see it in a real animation tool: a graph-editor plot of your
+current keyframes and Bezier handles, AND a filmstrip of a few stills
+showing how the animation actually looks across its duration. Use it to
+check both before you call `finish`.
 {%- endif %}
