@@ -9,29 +9,20 @@
 # ignored (with a warning) under openrouter. See runtime/providers/ for
 # how a request/response gets translated either way.
 worker:
-  provider: anthropic
-  models:
-    - claude-opus-5
-  # Example openrouter config (comment out the anthropic block above):
-  # provider: openrouter
+  # provider: anthropic
   # models:
-  #   - openai/gpt-5
-  #   - google/gemini-3-pro
+  #   - claude-opus-5
+  provider: openrouter
+  models:
+    - openai/gpt-5
 
-  # Sonnet 5 removed the fixed thinking budget: {type: enabled, budget_tokens: N}
-  # returns a 400. Adaptive is the only on-mode -- Claude decides how much to
-  # think per turn. Depth would be tuned with output_config.effort (default
-  # "high"), which runtime/agent.py does not pass through yet.
-  thinking:
-    type: adaptive
-
-  # Pinned rather than left to the API default (currently "high"). Effort
-  # changes how hard the worker thinks, so it is an experimental variable:
-  # leaving it implicit would let a future default change silently shift
-  # scores. Each run freezes this file, so every record states its effort.
-  # Levels: low | medium | high | xhigh | max.
-  output_config:
-    effort: high
+  # thinking/output_config are Anthropic-specific -- ignored (with a
+  # warning) under openrouter, so commented out rather than left to warn
+  # on every run. Restore these if provider is switched back to anthropic.
+  # thinking:
+  #   type: adaptive
+  # output_config:
+  #   effort: high
 
   # Per-API-call ceiling (separate from task.yaml's max_output_tokens,
   # a cumulative budget checked after each turn). With adaptive thinking
