@@ -85,11 +85,13 @@ def run_one_rollout(
     runner_yaml_path: Path,
     batch_dir: Path,
 ) -> Path:
-    if runner_cfg.provider != "anthropic":
-        raise ValueError(f"unsupported provider: {runner_cfg.provider}")
+    # Imported here so missing deps (e.g. the openai package, only needed
+    # for provider: openrouter) don't crash --help or --dry-run.
+    from runtime.providers import make_provider
 
-    # Imported here so missing deps don't crash `--help`.
-    from anthropic import Anthropic
+    provider = make_provider(
+        runner_cfg.provider, thinking=runner_cfg.thinking, output_config=runner_cfg.output_config
+    )
 
     run_dir = new_run_dir(batch_dir, cell)
     prompt_text = freeze_inputs(task, cell, task_yaml_path, runner_yaml_path, run_dir)
@@ -104,11 +106,9 @@ def run_one_rollout(
         bridge = ToolBridge(sandbox, framework=cell.framework)
 
         summary = run_agent(
-            client=Anthropic(),
+            provider=provider,
             model=cell.model,
             max_tokens=runner_cfg.max_tokens,
-            thinking=runner_cfg.thinking,
-            output_config=runner_cfg.output_config,
             prompt_text=prompt_text,
             tool_specs=tool_specs(feedback_spec.tools),
             tool_bridge=bridge,

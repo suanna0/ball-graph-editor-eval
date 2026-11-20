@@ -1,10 +1,22 @@
 # Runner config: WHO runs the grid and WHICH SLICE of it. Kept separate
 # from task/task.yaml so the task itself stays model-agnostic.
 
+# provider: "anthropic" (direct Anthropic API, model IDs like
+# "claude-opus-5") or "openrouter" (OpenAI-compatible endpoint covering
+# every non-Anthropic family -- GPT, Gemini, Llama, etc. -- model IDs
+# like "openai/gpt-5", "google/gemini-3-pro"; needs OPENROUTER_API_KEY in
+# .env). thinking/output_config below are Anthropic-specific and are
+# ignored (with a warning) under openrouter. See runtime/providers/ for
+# how a request/response gets translated either way.
 worker:
   provider: anthropic
   models:
     - claude-opus-5
+  # Example openrouter config (comment out the anthropic block above):
+  # provider: openrouter
+  # models:
+  #   - openai/gpt-5
+  #   - google/gemini-3-pro
 
   # Sonnet 5 removed the fixed thinking budget: {type: enabled, budget_tokens: N}
   # returns a 400. Adaptive is the only on-mode -- Claude decides how much to

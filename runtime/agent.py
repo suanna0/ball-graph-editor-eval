@@ -1,11 +1,22 @@
 """The agent loop: prompt -> model -> tool calls -> repeat, until the worker
-calls finish, the model ends its turn, or a rollout limit is hit."""
+calls finish, the model ends its turn, or a rollout limit is hit.
+
+Provider-agnostic (2026-11-19): this loop only ever touches the neutral
+shapes in runtime/providers/base.py (ModelResponse, ToolCall, ToolResult,
+Usage). Everything provider-specific -- wire format, field names, how
+conversation history is threaded between turns -- lives inside whichever
+Provider implementation is passed in (runtime/providers/{anthropic,
+openrouter}_provider.py). Mirrors extractor/src/adapters/*.ts: many wire
+formats in, one canonical shape for the code that doesn't need to care
+which one produced it."""
 from __future__ import annotations
 
 import json
 import time
 from pathlib import Path
 from typing import Any
+
+from runtime.providers.base import ContentBlock, Provider, ToolResult
 
 
 class EventLog:
@@ -14,26 +25,33 @@ class EventLog:
         self._f = open(path, "w")
 
     def log(self, kind: str, **fields: Any) -> None:
-        self._f.write(json.dumps({"ts": time.time(), "kind": kind, **fields}) + "\n")
+        self._f.write(json.dumps({"ts": time.time(), "kind": kind, **fields}, default=str) + "\n")
         self._f.flush()
 
     def close(self) -> None:
         self._f.close()
 
 
-def _block_to_jsonable(block) -> Any:
-    if hasattr(block, "model_dump"):
-        return block.model_dump()
-    return block
+def _to_content_blocks(raw_result: Any) -> list[ContentBlock]:
+    """tool_bridge.call() returns either a plain string, or (for
+    render_graph) a list of neutral {"type": "text"/"image", ...} dicts --
+    see runtime/tools.py."""
+    if isinstance(raw_result, str):
+        return [ContentBlock(type="text", text=raw_result)]
+    blocks = []
+    for item in raw_result:
+        if item["type"] == "text":
+            blocks.append(ContentBlock(type="text", text=item["text"]))
+        elif item["type"] == "image":
+            blocks.append(ContentBlock(type="image", media_type=item["media_type"], data=item["data"]))
+    return blocks
 
 
 def run_agent(
     *,
-    client,
+    provider: Provider,
     model: str,
     max_tokens: int,
-    thinking: dict | None,
-    output_config: dict | None,
     prompt_text: str,
     tool_specs: list[dict],
     tool_bridge,
@@ -42,9 +60,10 @@ def run_agent(
     max_tool_calls: int,
     max_output_tokens: int,
     event_log: EventLog,
+    **provider_config: Any,
 ) -> dict:
-    messages: list[dict] = [{"role": "user", "content": prompt_text}]
     event_log.log("prompt", content=prompt_text)
+    history = provider.start(prompt_text)
 
     start = time.time()
     turns = 0
@@ -65,78 +84,56 @@ def run_agent(
             break
 
         turns += 1
-        req = {
-            "model": model,
-            "max_tokens": max_tokens,
-            "tools": tool_specs,
-            "messages": messages,
-        }
-        if thinking:
-            req["thinking"] = thinking
-        if output_config:
-            req["output_config"] = output_config
-
         event_log.log("model_request", turn=turns)
-        # Streaming, not a plain create() call: once max_tokens is large
-        # enough that a request could plausibly run past 10 minutes (true
-        # here, with adaptive thinking at high effort), the SDK requires
-        # streaming and raises otherwise. get_final_message() still
-        # returns the same assembled Message shape .create() would, so
-        # nothing below this line needs to change.
-        with client.messages.stream(**req) as stream:
-            resp = stream.get_final_message()
+        response, history = provider.send(
+            history, tool_specs, model=model, max_tokens=max_tokens, **provider_config
+        )
 
-        for k in usage_totals:
-            usage_totals[k] += getattr(resp.usage, k, 0) or 0
+        usage_totals["input_tokens"] += response.usage.input_tokens
+        usage_totals["output_tokens"] += response.usage.output_tokens
+        usage_totals["cache_read_input_tokens"] += response.usage.cache_read_input_tokens
 
-        assistant_jsonable = [_block_to_jsonable(b) for b in resp.content]
         event_log.log(
             "model_response",
             turn=turns,
-            stop_reason=resp.stop_reason,
-            content=assistant_jsonable,
+            stop_reason=response.stop_reason,
+            content=response.raw,
         )
-        messages.append({"role": "assistant", "content": resp.content})
 
-        if resp.stop_reason != "tool_use":
-            final_stop = resp.stop_reason
+        if response.stop_reason != "tool_use":
+            final_stop = response.stop_reason
             break
 
-        tool_results = []
+        tool_results: list[ToolResult] = []
         over_budget = False
-        for block in resp.content:
-            if block.type != "tool_use":
-                continue
+        for call in response.tool_calls:
             tool_calls += 1
             if tool_calls > max_tool_calls:
-                tool_results.append({
-                    "type": "tool_result",
-                    "tool_use_id": block.id,
-                    "is_error": True,
-                    "content": "tool-call budget exhausted",
-                })
+                tool_results.append(ToolResult(
+                    tool_call_id=call.id,
+                    content=[ContentBlock(type="text", text="tool-call budget exhausted")],
+                    is_error=True,
+                ))
                 over_budget = True
                 continue
 
-            event_log.log("tool_call", id=block.id, name=block.name, input=block.input)
+            event_log.log("tool_call", id=call.id, name=call.name, input=call.input)
             try:
-                result = tool_bridge.call(block.name, block.input)
-                tool_results.append({
-                    "type": "tool_result",
-                    "tool_use_id": block.id,
-                    "content": result,
-                })
-                event_log.log("tool_result", id=block.id, ok=True)
+                raw_result = tool_bridge.call(call.name, call.input)
+                tool_results.append(ToolResult(
+                    tool_call_id=call.id,
+                    content=_to_content_blocks(raw_result),
+                ))
+                event_log.log("tool_result", id=call.id, ok=True)
             except Exception as e:
-                tool_results.append({
-                    "type": "tool_result",
-                    "tool_use_id": block.id,
-                    "is_error": True,
-                    "content": f"{type(e).__name__}: {e}",
-                })
-                event_log.log("tool_result", id=block.id, ok=False, error=str(e))
+                tool_results.append(ToolResult(
+                    tool_call_id=call.id,
+                    content=[ContentBlock(type="text", text=f"{type(e).__name__}: {e}")],
+                    is_error=True,
+                ))
+                event_log.log("tool_result", id=call.id, ok=False, error=str(e))
 
-        messages.append({"role": "user", "content": tool_results})
+        history = provider.append_tool_results(history, tool_results)
 
         if getattr(tool_bridge, "finished", False):
             final_stop = "finish"

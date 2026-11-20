@@ -58,6 +58,9 @@ The rubric items are adapted from this tutorial by Moshe Mahler
 ```
 runtime/        Python. Orchestrates rollouts: Docker sandbox, agent loop,
                 tool bridge, experiment-grid expansion, batch CLI.
+                runtime/providers/ wraps each model API behind one neutral
+                interface so the agent loop never touches a provider-
+                specific wire format.
 task/           The fixed physical brief (viewport, floor, start position,
                 time window), per-framework scaffolds, and the brief
                 template.
@@ -77,7 +80,7 @@ runs/           Gitignored. One <timestamp>[_<label>]/ batch directory per
 ## Quickstart
 
 ```bash
-cp .env.example .env   # fill in ANTHROPIC_API_KEY
+cp .env.example .env   # fill in ANTHROPIC_API_KEY (and OPENROUTER_API_KEY if using that provider)
 make build
 make dry-run                              # see which cells runner.yaml's grid expands to
 make run-batch LIMIT=1 LABEL=smoke-test   # run just the first cell
@@ -91,6 +94,24 @@ Widen the grid by editing `runner.yaml` (`worker.models`, `grid.frameworks`,
 itself (viewport, floor, ball size, time window) lives in `task/task.yaml`
 and is shared by every cell. `aggregate`/`gallery` scan all of `runs/`
 regardless of batch nesting.
+
+### Models and providers
+
+`runner.yaml`'s `worker.provider` picks the wire protocol, independent of
+which models are listed under `worker.models`:
+
+- `anthropic` -- direct Anthropic API, model IDs like `claude-opus-5`.
+- `openrouter` -- OpenAI-compatible endpoint covering every non-Anthropic
+  family in one adapter (GPT, Gemini, Llama, etc.), model IDs like
+  `openai/gpt-5`, `google/gemini-3-pro`. Needs `OPENROUTER_API_KEY`.
+
+Both are implemented behind the same `Provider` interface
+(`runtime/providers/base.py`); the agent loop, rollout runner, and grid
+expansion never branch on which one is active. Adding another model
+family that isn't covered by OpenRouter means adding one more module next
+to `runtime/providers/{anthropic,openrouter}_provider.py` -- nothing else
+in `runtime/` changes. `thinking`/`output_config` in `runner.yaml` are
+Anthropic-specific and are ignored (with a warning) under `openrouter`.
 
 ## Canonical curve schema
 

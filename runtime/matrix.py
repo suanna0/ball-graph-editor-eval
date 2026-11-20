@@ -21,7 +21,12 @@ class Cell:
 
     @property
     def cell_id(self) -> str:
-        return f"{self.model}_{self.framework}_{self.material}_{self.feedback_mode}_s{self.seed:02d}"
+        # OpenRouter-style model slugs ("openai/gpt-5") contain "/", which
+        # would otherwise be read as a path separator and silently nest an
+        # extra directory -- the model stays intact for the actual API call
+        # (Cell.model), this only affects the directory name.
+        model_slug = self.model.replace("/", "--")
+        return f"{model_slug}_{self.framework}_{self.material}_{self.feedback_mode}_s{self.seed:02d}"
 
 
 def expand_grid(task: TaskSpec, runner: RunnerSpec) -> list[Cell]:

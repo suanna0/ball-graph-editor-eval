@@ -201,8 +201,11 @@ class ToolBridge:
             return f"render_graph failed:\n{proc.stderr[-2000:]}"
         payload = json.loads(proc.stdout)
 
+        # Neutral shape (provider-agnostic, 2026-11-19): runtime/agent.py
+        # converts this into whichever provider's own content-block format
+        # applies, so nothing here names Anthropic specifically.
         def _image(b64: str) -> dict:
-            return {"type": "image", "source": {"type": "base64", "media_type": "image/png", "data": b64}}
+            return {"type": "image", "media_type": "image/png", "data": b64}
 
         blocks: list[dict] = [
             {"type": "text", "text": "Graph-editor plot of your current keyframes and handles:"},
