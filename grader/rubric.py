@@ -27,18 +27,27 @@ see extractor/src/schema.ts:CanonicalCurveSet for its exact shape:
 The return value must be:
 
     {
-      "score": float,            # 0..1 overall
+      "score": float,            # 0..1 overall, = n_passed / n_checks
+      "n_passed": int,           # how many checks passed
+      "n_checks": int,           # 10
       "checks": {                # one entry per rubric check
-        "<check_name>": {"score": float, "weight": float, "detail": str}
+        "<check_name>": {"score": float, "detail": str}
       }
     }
 
 SCORING. Every check's "score" is strictly 0.0 or 1.0 -- no partial
-credit, even for the multi-condition checks (3's monotonic AND concave,
-7's pairing AND constant-difference both need to hold for a 1.0; either
-failing is a 0.0 for that check, not a half-credit). "weight" is the raw
-point value from the (N pts) tag below (8 or 5). The overall `score` is
-sum(check["score"] * check["weight"] for check in checks.values()) / 50.
+credit, even for the multi-condition checks (4's monotonic AND concave,
+9's pairing AND constant-difference both need to hold for a 1.0; either
+failing is a 0.0 for that check, not a half-credit). All 10 checks count
+equally and the overall `score` is simply the number that passed over 10:
+these are pass/fail specs, so the total is a count, and a check that
+reads "every Y key is a contact or apex" is a specification rather than a
+tolerance -- one stray key fails it outright.
+
+A single number says little about BEHAVIOR, though: two submissions can
+reach the same N by failing entirely different checks. The per-check pass
+rate from analysis/aggregate.py is the primary output; this scalar is a
+convenience.
 
 SIGN CONVENTION. Extracted y is raw DOM/CSS screen space, so y increases
 DOWNWARD (task.yaml: floor_y_px = 460, apex = 140). In that raw data a
@@ -49,7 +58,7 @@ every check below reads in the same orientation a graph editor draws it.
 No need for floor_y_px; the negation alone is sufficient. The checks below
 all assume this normalization has already been applied.
 
-EXTREMA CLASSIFICATION. Checks 1, 2, and 4 all need to know which
+EXTREMA CLASSIFICATION. Checks 1, 2, 3, 5, 8, 9 and 10 all need to know which
 Translate Y keyframes are contacts (local minima of y_plot) vs. apexes
 (local maxima), so it's defined once here instead of per-check. For each
 keyframe i in the y_plot sequence:
@@ -61,19 +70,16 @@ keyframe i in the y_plot sequence:
     == y_plot[i+1]) is NEITHER a contact nor an apex. This isn't a gap in
     the rule: a flat plateau -- e.g. a submission that adds an explicit
     trailing hold keyframe at the same value, instead of just letting the
-    animation end -- is exactly the kind of excess key check 4 is meant
+    animation end -- is exactly the kind of excess key check 5 is meant
     to catch. An unclassified plateau key shows up as an uncounted extra
-    keyframe and fails check 4's exact-count comparison on its own, no
+    keyframe and fails check 5's exact-count comparison on its own, no
     special case needed.
 
-The graph-editor rubric, for reference (not implemented here). Ordered by
-necessity -- how diagnostic each check is of "did the model actually
-produce a correct bounce" -- most to least. Every check is pass/fail with
-no partial credit, and all 7 count equally: `score` is the number that
-passed over 7. See tolerances.yaml for the numbers the checks themselves
-use.
+The graph-editor rubric. Every check is pass/fail with no partial credit
+and all 10 count equally. See tolerances.yaml for the numbers the checks
+themselves use.
 
-FRAME UNIT. Checks 6 and 7 size their time tolerances in frames at an
+FRAME UNIT. Checks 8, 9 and 10 size their time tolerances in frames at an
 assumed 24fps (1 frame ~= 0.041667s). This is purely a human-friendly unit
 for sizing an epsilon -- the schema has no frame-rate field, times are
 plain seconds, and css/waa/gsap/motion output is continuous-time, not
@@ -81,7 +87,13 @@ actually quantized to any frame grid (only Lottie natively is). "Within 1
 frame" just means "within ~0.0417s"; it is not a claim that submissions
 snap to a 24fps grid.
 
-    1. (8 pts) At contacts, the curve stays below the tangent handles and
+    1. The submission actually attempts a bounce sequence: the ball meets
+       the floor at least `min_bounces` times (tolerances.yaml, currently
+       3). Counted as the number of contacts (local minima of y_plot), so
+       a single drop that lands and stops, or a slide with no vertical
+       motion at all, fails here rather than passing the shape checks
+       vacuously on one or two keys.
+    2. At contacts, the curve stays below the tangent handles and
        never bulges above them -- convex-hull bound: build the 4 absolute
        control points per segment (P0=(time,value), P1=(time+out.dt,
        value+out.dv), P2=(next.time+next.in.dt, next.value+next.in.dv),
@@ -94,7 +106,7 @@ snap to a 24fps grid.
        through or under it instead of reversing in a sharp V. The single
        most diagnostic check: a curve that fails this doesn't read as a
        bounce at all.
-    2. (8 pts) Translate Y makes a corner at each contact and a smooth
+    3. Translate Y makes a corner at each contact and a smooth
        crest at each apex. Each key carries two handles -- inHandle
        pointing back at the previous key, outHandle pointing forward at
        the next -- and each handle has a slope of dv/dt. At a contact the
@@ -104,7 +116,7 @@ snap to a 24fps grid.
        two handles must instead form a straight horizontal line --
        matching slopes with dv ~= 0 on both -- so the curve crests rather
        than peaks.
-    3. (8 pts) Translate X is linear OR ease-out -- either passes, with no
+    4. Translate X is linear OR ease-out -- either passes, with no
        bound on how aggressive the ease-out is. Reduces to two conditions
        over the whole x channel: value is monotonic from the first key to
        the last (catches overshoots and backtracking), and velocity
@@ -116,14 +128,23 @@ snap to a 24fps grid.
        increase and fails concavity, while an overshoot fails
        monotonicity. A merely decelerating tail is a legitimate ease-out
        and passes.
-    4. (8 pts) Translate Y keys sit on contacts and apexes, without
+    5. Translate Y keys sit on contacts and apexes, without
        excessive in-between keys -- exact count: len(y keyframes) must
        equal num_contacts (local minima) + num_apexes (local maxima) in
        the normalized value sequence, zero tolerance for anything extra.
        Graph-editor craftsmanship -- a submission can still look right
-       with extra keys as long as checks 1-2 hold, so this is more about
+       with extra keys as long as checks 2-3 hold, so this is more about
        doing it the efficient way than about correctness of the result.
-    5. (8 pts) No stray keys on unused channels (rotate, visibility,
+    6. Translate X has at most `max_x_keys` keyframes (tolerances.yaml,
+       currently 2) -- in practice a start and an end. A ball travelling
+       left to right needs no interior x keys, and keeping the channel to
+       one span is what makes the horizontal path smooth and easily
+       modifiable: a human can retime the whole traverse by dragging one
+       key, instead of having to re-space a dozen. Note this is a strictly
+       stronger statement than check 4, which only constrains x's SHAPE --
+       a dense x channel can still be monotonic and concave while being
+       miserable to edit.
+    7. No stray keys on unused channels (rotate, visibility,
        etc.). As of 2026-11-17 the brief scopes the task to POSITION ONLY
        and explicitly forbids keying scale/rotation/opacity, so scaleX,
        scaleY and rotation are all genuinely stray here and this check can
@@ -132,15 +153,25 @@ snap to a 24fps grid.
        made penalizing them unfair -- if the brief is ever widened again,
        loosen this.
 
-    6. (5 pts) Translate X and Translate Y come to rest together: the LAST
-       keyframe of the x channel and the LAST keyframe of the y channel
-       must land on the same frame -- within 1 frame (~0.0417s). The ball
-       shouldn't still be rolling after it's done bouncing, or still be
-       settling its bounce after it's stopped moving sideways -- both
-       channels' motion ends at once. (The `perfect` fixtures were
-       regenerated on 2026-11-17 so x's only keyframe after the start is at
-       the same time as y's last contact, 4.083333s / frame 98 @24fps.)
-    7. (5 pts) Bounce timing decelerates at a CONSTANT RATE -- not uniform
+    8. The x channel stops at one of exactly two defensible moments,
+       measured against the LAST bounce. Let L be the length of the last
+       bounce -- the time from the second-to-last contact to the last one
+       -- and let T be the time of the last contact. The final x keyframe
+       must land within `final_x_key_frames` (tolerances.yaml, currently
+       1 frame ~= 0.0417s) of EITHER:
+         - T, the ball stopping horizontally exactly as it stops bouncing;
+         - or T + L, the ball ROLLING for one more last-bounce length after
+           its final contact before coming to rest.
+       Both read correctly; anything else does not. Stopping before T
+       means the ball bounces in place with no forward travel, and
+       stopping well after T + L means it keeps gliding long after the
+       bounce has died, with no bounce left to motivate the motion.
+       Replaces an earlier "x and y must end on the same frame" rule,
+       which only admitted the first of these two and penalized the roll
+       -- a legitimate and common choice. (The `perfect` fixtures put x's
+       final key at T = 4.083333s / frame 98 @24fps, satisfying the first
+       branch.)
+    9. Bounce timing decelerates at a CONSTANT RATE -- not uniform
        gaps, and not physical sqrt(h) decay, but an arithmetic progression
        of half-periods. Each bounce i (i=0 for the initial fall from the
        start pose, i=1,2,... for each full bounce after) has a half-period
@@ -165,13 +196,28 @@ snap to a 24fps grid.
        difference of differences and small errors compound across
        bounces.
 
-       NOTE this is the lowest-weighted check because it's purely
-       STYLISTIC (an animation-class convention: pacing that decelerates
-       smoothly rather than either staying perfectly even or decaying
-       geometrically the way real gravity would -- sqrt(h) is NOT linear
-       in the bounce index), not physics. A model that nails the shape
-       (checks 1-2) with realistic physical timing instead is still doing
-       something defensible. The `perfect` fixtures were regenerated on
+       NOTE this check is purely STYLISTIC (an animation-class
+       convention: pacing that decelerates smoothly rather than either
+       staying perfectly even or decaying geometrically the way real
+       gravity would -- sqrt(h) is NOT linear in the bounce index), not
+       physics. A model that nails the shape (checks 2-3) with realistic
+       physical timing instead is still doing something defensible --
+       which matters more now that all 10 checks count equally and this
+       one is no longer discounted by a lower weight.
+   10. Every contact's Bezier handles are non-trivial -- they must have
+       some influence on the curve rather than being zero-length. Measured
+       on TIME extent: each handle present on a contact must span more
+       than `min_contact_handle_frames` (tolerances.yaml, currently 0.25
+       frames ~= 0.0104s) of |dt|. Time is the right axis because a
+       control point sitting at its keyframe's own time shapes nothing no
+       matter what its dv is, whereas dt with dv=0 does shape the curve
+       (that's exactly what a flat apex crest is). A contact with no
+       handle at all on one side passes vacuously there -- the final
+       contact has no outHandle by construction, the same allowance check
+       3 makes for boundary contacts. Deliberately sized as a degeneracy
+       test rather than a craftsmanship bar: a genuinely fast last bounce
+       has legitimately short handles, and the reference fixtures' own
+       tightest handle is only 0.667 frames. The `perfect` fixtures were regenerated on
        2026-11-17 with d_i = 14, 12, 10, 8, 6, 4 frames (24fps assumed --
        the schema has no frame-rate field, times are plain seconds) to
        satisfy this.
@@ -239,7 +285,7 @@ def _classify_extrema(y_plot: list[dict[str, Any]]) -> list[str | None]:
 
 def _control_points(a: dict[str, Any], b: dict[str, Any]) -> list[tuple[float, float]]:
     """4 absolute control points for the cubic Bezier segment a->b, per
-    check 1's definition. Requires a['outHandle'] and b['inHandle']."""
+    check 2's definition. Requires a['outHandle'] and b['inHandle']."""
     return [
         (a["time"], a["value"]),
         (a["time"] + a["outHandle"]["dt"], a["value"] + a["outHandle"]["dv"]),
@@ -345,13 +391,64 @@ def _check_no_stray_keys(props) -> tuple[bool, str]:
     return True, "no stray keys on unused channels"
 
 
-def _check_settle_together(x_kfs, y_kfs, tolerance_s) -> tuple[bool, str]:
-    if not x_kfs or not y_kfs:
-        return False, "x or y channel has no keyframes"
-    x_end, y_end = x_kfs[-1]["time"], y_kfs[-1]["time"]
-    if abs(x_end - y_end) > tolerance_s:
-        return False, f"x ends at t={x_end:.4f}, y ends at t={y_end:.4f} (off by {abs(x_end - y_end):.4f}s)"
-    return True, f"x and y both end at ~t={y_end:.4f}"
+def _check_contact_handles_nontrivial(y_plot, labels, min_dt_s) -> tuple[bool, str]:
+    violations = []
+    for i, label in enumerate(labels):
+        if label != "contact":
+            continue
+        for name in ("inHandle", "outHandle"):
+            h = y_plot[i].get(name)
+            if h is None:
+                # A boundary contact has no handle on that side at all --
+                # the last contact never has an outHandle. Nothing was
+                # authored there, so there's nothing to judge; this is the
+                # same vacuous pass the corner check gives them.
+                continue
+            if abs(h["dt"]) <= min_dt_s:
+                violations.append(
+                    f"contact at key {i} (t={y_plot[i]['time']:.4f}): {name} spans "
+                    f"dt={h['dt']:+.5f}s, no influence on the curve"
+                )
+    if violations:
+        return False, "; ".join(violations)
+    return True, "every contact handle spans real time"
+
+
+def _check_min_bounces(labels, minimum) -> tuple[bool, str]:
+    contacts = sum(1 for l in labels if l == "contact")
+    if contacts < minimum:
+        return False, f"ball meets the floor {contacts} time(s), fewer than the {minimum} required"
+    return True, f"ball meets the floor {contacts} time(s)"
+
+
+def _check_x_key_count(x_kfs, maximum) -> tuple[bool, str]:
+    if len(x_kfs) > maximum:
+        return False, (
+            f"{len(x_kfs)} x keyframes, more than the {maximum} allowed -- x isn't "
+            f"one smooth span a human could grab and retime"
+        )
+    return True, f"{len(x_kfs)} x keyframe(s)"
+
+
+def _check_final_x_key(x_kfs, y_plot, labels, tolerance_s) -> tuple[bool, str]:
+    if not x_kfs:
+        return False, "x channel has no keyframes"
+    contact_times = [y_plot[i]["time"] for i, l in enumerate(labels) if l == "contact"]
+    if len(contact_times) < 2:
+        return False, f"{len(contact_times)} contact(s) -- need 2 to measure the last bounce's length"
+    last_contact = contact_times[-1]
+    last_bounce_len = last_contact - contact_times[-2]
+    roll_end = last_contact + last_bounce_len
+    x_end = x_kfs[-1]["time"]
+    stops = abs(x_end - last_contact) <= tolerance_s
+    rolls = abs(x_end - roll_end) <= tolerance_s
+    if not stops and not rolls:
+        return False, (
+            f"final x key at t={x_end:.4f} is neither the last contact (t={last_contact:.4f}) "
+            f"nor one last-bounce length past it (t={roll_end:.4f})"
+        )
+    how = "stops with the last contact" if stops else "rolls one last-bounce length past the last contact"
+    return True, f"final x key at t={x_end:.4f} {how}"
 
 
 def _check_bounce_timing(y_plot, pairing_tolerance_s, diff_tolerance_s) -> tuple[bool, str]:
@@ -397,16 +494,21 @@ def score(curves: dict[str, Any]) -> dict[str, Any]:
         passed, detail = result
         checks[name] = {"score": 1.0 if passed else 0.0, "detail": detail}
 
+    # Order matches the numbered spec in this module's docstring.
+    _add("min_bounces", _check_min_bounces(labels, int(tol["min_bounces"])))
     _add("contact_convex_hull", _check_contact_convex_hull(y_plot, labels))
     _add("corner_at_contact_flat_apex", _check_corner_and_crest(
         y_plot, labels, t["flat_apex_dv"], t["corner_slope_eps"]))
     _add("x_shape", _check_x_shape(x_kfs))
     _add("y_key_count", _check_y_key_count(labels))
+    _add("x_key_count", _check_x_key_count(x_kfs, int(tol["max_x_keys"])))
     _add("no_stray_keys", _check_no_stray_keys(props))
-    _add("settle_together", _check_settle_together(
-        x_kfs, y_kfs, t["settle_together_frames"] * frame_s))
+    _add("final_x_key", _check_final_x_key(
+        x_kfs, y_plot, labels, t["final_x_key_frames"] * frame_s))
     _add("bounce_timing", _check_bounce_timing(
         y_plot, t["bounce_timing_pairing_frames"] * frame_s, t["bounce_timing_diff_frames"] * frame_s))
+    _add("contact_handles_nontrivial", _check_contact_handles_nontrivial(
+        y_plot, labels, t["min_contact_handle_frames"] * frame_s))
 
     # N of 7, not a weighted sum out of 50. Every check is a pass/fail spec
     # with no partial credit, so the total was always a subset-sum of the

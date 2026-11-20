@@ -1,31 +1,47 @@
-# Tolerances for grader/rubric.py's score(). Every number a check actually
-# uses lives here, not hardcoded in rubric.py -- except float-noise guards
-# (e.g. a 1e-9 comparison epsilon), which aren't real design choices and
-# stay inline as code constants. One-line comment per entry explaining the
-# choice.
+# Tolerances and limits for grader/rubric.py's score(). Every number a check
+# actually uses lives here, not hardcoded in rubric.py -- except float-noise
+# guards (e.g. a 1e-9 comparison epsilon), which aren't real design choices
+# and stay inline as code constants. One-line comment per entry explaining
+# the choice.
 
-# Checks 6 and 7 size their time tolerances in frames at this assumed rate
+# Checks 8, 9 and 10 size their time tolerances in frames at this assumed rate
 # (see rubric.py's FRAME UNIT note: it's a human-friendly unit, not a claim
 # that submissions are frame-quantized).
 fps: 24
 
+# check 1: the ball must meet the floor at least this many times. A count of
+# floor contacts, so a single drop-and-stop can't pass as a bounce.
+min_bounces: 3
+
+# check 6: x may have at most this many keyframes -- a start and an end, so
+# the whole horizontal path stays one span a human can grab and retime.
+max_x_keys: 2
+
 tolerances:
-  # check 2: an apex handle's dv must be within this of 0 to count as
+  # check 3: an apex handle's dv must be within this of 0 to count as
   # flat. Value-domain (px), not frame-based -- a slope epsilon, not a
   # time one.
   flat_apex_dv: 0.01
-  # check 2: minimum |slope_in - slope_out| at a contact to count as a
+  # check 3: minimum |slope_in - slope_out| at a contact to count as a
   # corner rather than a smooth round-through. Deliberately tiny -- this
   # is a float-noise guard, not a real "how sharp" threshold.
   corner_slope_eps: 1.0e-6
-  # check 6: x's last keyframe and y's last keyframe must land within
-  # this many frames of each other.
-  settle_together_frames: 1
-  # check 7: the two gaps making up one bounce's half-period (g_2 vs g_3,
+  # check 8: the final x keyframe must land within this many frames of
+  # either the last contact or one last-bounce length past it.
+  final_x_key_frames: 1
+  # check 9: the two gaps making up one bounce's half-period (g_2 vs g_3,
   # etc.) must match within this many frames.
   bounce_timing_pairing_frames: 1
-  # check 7: consecutive half-period decrements (d_i - d_(i+1)) must
+  # check 9: consecutive half-period decrements (d_i - d_(i+1)) must
   # match each other within this many frames. Looser than the pairing
   # tolerance since it's a difference of differences and errors compound
   # across bounces -- midpoint of the 1.5-2 frame range discussed.
   bounce_timing_diff_frames: 1.75
+  # check 10: a contact handle must span more than this many frames of
+  # time to count as having influence. A degeneracy test, not a quality
+  # bar: it catches the dt=0 / (-0.0,-0.0) handle that shapes nothing,
+  # while staying clear of legitimately short handles on a fast final
+  # bounce. The perfect fixtures' tightest real handle is 0.667 frames
+  # (dt=0.0278s) at their last contact, so raising this past ~0.6 would
+  # start failing the reference solution.
+  min_contact_handle_frames: 0.25
