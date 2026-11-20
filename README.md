@@ -41,8 +41,10 @@ points.
 
 Once the worker finishes, `grader/grade.py` re-extracts curves from a
 frozen snapshot of the worker's final files and calls `grader/rubric.py`'s
-`score()`, which runs 10 checks and scores N of 10. A single number says little about behavior, so the per-check pass
-rate from `analysis/aggregate.py` is the primary output.
+`score()`, which runs 10 checks and scores N of 10. Every check is pass/fail 
+with no partial credit. Both `grader/fixtures/perfect/` fixtures score 10/10. A 
+single number says little about behavior, so the per-check pass rate from 
+`analysis/aggregate.py` is the primary output.
 
 1. Attempts at least 3 bounces (the ball meets the floor 3+ times)
 2. At a given contact point, the ball's path does not bulge past its handlebars
@@ -54,12 +56,7 @@ rate from `analysis/aggregate.py` is the primary output.
 8. The final X key lands either on the last contact of the last bounce, or one
    last-bounce length past it (the ball rolling to a stop)
 9. The time of each bounce decreases at a constant rate
-10. Contact points have non-trivial handles -- a zero-length handle shapes
-    nothing, so each handle present on a contact must span real time
-
-Every check is pass/fail with no partial credit -- "every Y key is a contact
-or apex" is a specification, not a tolerance, so one stray key fails the item
-outright. Both `grader/fixtures/perfect/` fixtures score 10/10.
+10. Contact points have handles of length greater than zero
 
 The rubric items are adapted from this tutorial by Moshe Mahler 
 (https://vimeo.com/423284703?fl=pl&fe=vl)
