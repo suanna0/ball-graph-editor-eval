@@ -28,7 +28,7 @@ _REPO_ROOT = Path(__file__).resolve().parents[1]
 
 
 def _stub_score(curves: dict[str, Any]) -> dict[str, Any]:
-    return {"score": 0.5, "checks": {"stub": {"score": 0.5, "weight": 1.0, "detail": "rubric not implemented yet"}}}
+    return {"score": 0.5, "checks": {"stub": {"score": 0.5, "detail": "rubric not implemented yet"}}}
 
 
 def extract_curves(extractor_cmd: list[str], final_dir: Path, framework: str, timeout: int = 60) -> dict[str, Any]:

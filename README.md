@@ -40,18 +40,85 @@ a graph plot and a filmstrip of stills
 
 Once the worker finishes, `grader/grade.py` re-extracts curves from a
 frozen snapshot of the worker's final files and calls `grader/rubric.py`'s
-`score()`, which runs 7 checks for a score out of 50 points:
+`score()`, which runs 7 checks and scores **N of 7**:
 
-1. At a given contact point, the ball's path does not bulge past its handlebars (8 pts)
-2. Contact points have broken tangents and apexes are smooth (8 pts)
-3. Translate X is linear or subtle ease-out (monotonic, non-increasing velocity) (8 pts)
-4. Every Y key is either a contact or apex, no unnecessary keys (8 pts)
-5. No stray keys on unused channels (scale/rotation) (8 pts)
-6. X and Y finish at the same frame (5 pts)
-7. The time of each bounce decreases at a constant rate (5 pts)
+1. At a given contact point, the ball's path does not bulge past its handlebars
+2. Contact points have broken tangents and apexes are smooth
+3. Translate X is linear or subtle ease-out (monotonic, non-increasing velocity)
+4. Every Y key is either a contact or apex, no unnecessary keys
+5. No stray keys on unused channels (scale/rotation)
+6. X and Y finish at the same frame
+7. The time of each bounce decreases at a constant rate
+
+Each check is a pass/fail spec with **no partial credit** -- "every Y key is
+a contact or apex" is a specification, not a tolerance, so one stray key
+fails the item outright. That makes the overall score a count, which is why
+it is reported as N/7 rather than a weighted total: with no partial credit
+the total was always a subset-sum of the weights anyway, and those weights
+were near-uniform enough to carry no resolution the count doesn't (29/50 and
+4/7 differ by under a point) while obscuring how many specs actually failed.
+
+A single number therefore says little about *behavior* -- two models can
+reach the same N by failing entirely different checks. The per-check pass
+rate from `analysis/aggregate.py` is the primary output; the scalar is a
+convenience.
 
 The rubric items are adapted from this tutorial by Moshe Mahler 
 (https://vimeo.com/423284703?fl=pl&fe=vl)
+
+## Findings so far
+
+First multi-model batch: 4 models x 5 seeds on CSS / rubber ball / full
+feedback, via OpenRouter, 2026-11-20. 20/20 rollouts completed, none
+truncated.
+
+| Model | Score | Per-seed | SD | Cost |
+|-------|-------|----------|-----|------|
+| `anthropic/claude-opus-5.5` | **4/7** | 4,4,4,4,4 | 0.00 | $1.75 |
+| `openai/gpt-6-sol` | **4/7** | 4,4,4,4,4 | 0.00 | $0.41 |
+| `openai/gpt-6-luna` | **4/7** | 4,4,4,4,4 | 0.00 | $0.02 |
+| `google/gemini-4-hydrogen` | 3.4/7 | 3,3,3,4,4 | 0.55 | $5.24 |
+
+Per-check pass rate (of 5 seeds):
+
+| Check | opus-5.5 | gpt-6-sol | gpt-6-luna | gemini-4-h |
+|-------|----------|-----------|------------|------------|
+| 1 `contact_convex_hull` | 5/5 | 5/5 | 5/5 | 5/5 |
+| 2 `corner_at_contact_flat_apex` | 5/5 | 5/5 | 5/5 | **2/5** |
+| 3 `x_shape` | **0/5** | **0/5** | **0/5** | **0/5** |
+| 4 `y_key_count` | **0/5** | **0/5** | **0/5** | **0/5** |
+| 5 `no_stray_keys` | 5/5 | 5/5 | 5/5 | 5/5 |
+| 6 `settle_together` | 5/5 | 5/5 | 5/5 | 5/5 |
+| 7 `bounce_timing` | **0/5** | **0/5** | **0/5** | **0/5** |
+
+**The eval does not currently discriminate between frontier models.** Four
+checks pass universally and three fail universally (0/20 across every
+model), so three different models land on exactly the same score. Reading
+the failure details, two structural causes account for most of it:
+
+- **A trailing rest key.** Models end `y` with the ball settled on the floor
+  (`...455, 460, 460`). Check 4 flags exactly those last two keys in 11 of
+  15 runs, and check 7 fails as "can't split into d_0 plus whole bounces"
+  in 11 of 15, because the same extra key makes the gap count odd. One
+  artifact breaks two checks, and the brief asks the ball to come to rest.
+  Check 7's constant-decrement test is therefore rarely even reached.
+- **One timing function per segment, shared across both axes.** Check 3
+  fails at `t=0.0000` in 13 of 15 runs: the opening drop needs an ease-in
+  for Y, and a single-element `@keyframes` forces X onto that same curve.
+  Extracted X and Y key counts are identical in all 20 runs -- (48,48),
+  (19,19), (13,13) -- so X cannot be eased independently without splitting
+  the transforms across two nested elements. Check 3 may be unsatisfiable
+  as the task is currently scaffolded.
+
+Severity is invisible to a pass/fail score but separates the models
+sharply: on check 4, one `gpt-6-sol` run has 2 stray keys out of 13 while
+an `opus-5.5` run has 33 out of 48. Both score 0. Structured violation
+counts (rather than prose `detail` strings) would make that a reportable
+axis without introducing partial credit.
+
+Cost note: `gemini-4-hydrogen` ran 14-20 turns and re-sent `render_graph`
+images each turn, spending 2.78M input tokens -- 250x `gpt-6-luna` for a
+lower score.
 
 ## Repo layout
 

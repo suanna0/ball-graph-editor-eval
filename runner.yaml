@@ -14,7 +14,19 @@ worker:
   #   - claude-opus-5
   provider: openrouter
   models:
-    - openai/gpt-5
+    - anthropic/claude-opus-5.5
+    - openai/gpt-6-sol
+    - openai/gpt-6-luna
+    - google/gemini-4-hydrogen
+
+  # No temperature is set, deliberately. OpenRouter's model metadata lists
+  # `temperature` as unsupported on every one of the models above except
+  # gemini-4-hydrogen (they're reasoning models), so pinning it would apply
+  # to one cell of the grid and be dropped or rejected on the rest --
+  # worse than leaving it unset, since it would read as a controlled
+  # variable without being one. Across-seed spread therefore comes from
+  # each model's own default sampling, which is also what makes repeated
+  # seeds informative rather than redundant.
 
   # thinking/output_config are Anthropic-specific -- ignored (with a
   # warning) under openrouter, so commented out rather than left to warn
@@ -39,9 +51,19 @@ grid:
   frameworks: [css]
   materials: [rubber_ball]
   feedback_modes: [full_feedback]
-  seeds: 1
+  # 5, not 1-3: analysis/aggregate.py reports paired-bootstrap CIs over
+  # seeds, and resampling fewer than ~5 points per cell produces an
+  # interval that mostly reflects the resampling, not the model. Held at
+  # the low end of useful because every extra seed multiplies across the
+  # model list.
+  seeds: 5
 
 batch:
-  concurrency: 1
+  # Each rollout holds its own container (capped at --memory 2g in
+  # runtime/sandbox.py) and Docker's VM here has 7.75GB total. The cap is
+  # a ceiling rather than a reservation and these containers idle at a few
+  # tens of MB, so 4 in flight is comfortable; it also spreads the API
+  # load across all four providers instead of serializing on one.
+  concurrency: 4
 
 output_dir: ./runs

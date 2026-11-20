@@ -1,25 +1,13 @@
-# Weights and tolerances for grader/rubric.py's score(). Every number a
-# check actually uses lives here, not hardcoded in rubric.py -- except
-# float-noise guards (e.g. a 1e-9 comparison epsilon), which aren't real
-# design choices and stay inline as code constants. One-line comment per
-# entry explaining the choice.
+# Tolerances for grader/rubric.py's score(). Every number a check actually
+# uses lives here, not hardcoded in rubric.py -- except float-noise guards
+# (e.g. a 1e-9 comparison epsilon), which aren't real design choices and
+# stay inline as code constants. One-line comment per entry explaining the
+# choice.
 
 # Checks 6 and 7 size their time tolerances in frames at this assumed rate
 # (see rubric.py's FRAME UNIT note: it's a human-friendly unit, not a claim
 # that submissions are frame-quantized).
 fps: 24
-
-# Points per check, matching the (N pts) tags in rubric.py's docstring.
-# 1-5 are the "does this look like a correct bounce" checks; 6-7 are
-# lower-weighted because they're polish/style, not shape correctness.
-weights:
-  contact_convex_hull: 8          # check 1
-  corner_at_contact_flat_apex: 8  # check 2
-  x_shape: 8                      # check 3
-  y_key_count: 8                  # check 4
-  no_stray_keys: 8                # check 5
-  settle_together: 5              # check 6
-  bounce_timing: 5                # check 7
 
 tolerances:
   # check 2: an apex handle's dv must be within this of 0 to count as

@@ -68,11 +68,10 @@ keyframe i in the y_plot sequence:
 
 The graph-editor rubric, for reference (not implemented here). Ordered by
 necessity -- how diagnostic each check is of "did the model actually
-produce a correct bounce" -- most to least, and weighted accordingly:
-checks 1-5 are 8 points each (40), checks 6-7 are 5 points each (10), for
-a 50-point total. Divide by 50 for the 0..1 `score` the interface above
-expects. See tolerances.yaml for where these weights/tolerances should
-actually live once this is implemented.
+produce a correct bounce" -- most to least. Every check is pass/fail with
+no partial credit, and all 7 count equally: `score` is the number that
+passed over 7. See tolerances.yaml for the numbers the checks themselves
+use.
 
 FRAME UNIT. Checks 6 and 7 size their time tolerances in frames at an
 assumed 24fps (1 frame ~= 0.041667s). This is purely a human-friendly unit
@@ -384,7 +383,6 @@ def _check_bounce_timing(y_plot, pairing_tolerance_s, diff_tolerance_s) -> tuple
 def score(curves: dict[str, Any]) -> dict[str, Any]:
     tol = _load_tolerances()
     frame_s = 1.0 / float(tol["fps"])
-    weights = tol["weights"]
     t = tol["tolerances"]
 
     props = curves.get("properties", {})
@@ -397,7 +395,7 @@ def score(curves: dict[str, Any]) -> dict[str, Any]:
 
     def _add(name: str, result: tuple[bool, str]) -> None:
         passed, detail = result
-        checks[name] = {"score": 1.0 if passed else 0.0, "weight": float(weights[name]), "detail": detail}
+        checks[name] = {"score": 1.0 if passed else 0.0, "detail": detail}
 
     _add("contact_convex_hull", _check_contact_convex_hull(y_plot, labels))
     _add("corner_at_contact_flat_apex", _check_corner_and_crest(
@@ -410,7 +408,14 @@ def score(curves: dict[str, Any]) -> dict[str, Any]:
     _add("bounce_timing", _check_bounce_timing(
         y_plot, t["bounce_timing_pairing_frames"] * frame_s, t["bounce_timing_diff_frames"] * frame_s))
 
-    total_weight = sum(c["weight"] for c in checks.values())
-    overall = (sum(c["score"] * c["weight"] for c in checks.values()) / total_weight) if total_weight else 0.0
+    # N of 7, not a weighted sum out of 50. Every check is a pass/fail spec
+    # with no partial credit, so the total was always a subset-sum of the
+    # weights -- and with those weights near-uniform (five 8s, two 5s) it
+    # carried no resolution the count doesn't, while hiding how many specs
+    # actually failed: 29/50 and 4/7 differ by under a point. See
+    # analysis/aggregate.py for the per-check profile, which is where
+    # behavioral differences between models actually show up.
+    n_passed = int(sum(c["score"] for c in checks.values()))
+    overall = (n_passed / len(checks)) if checks else 0.0
 
-    return {"score": overall, "checks": checks}
+    return {"score": overall, "n_passed": n_passed, "n_checks": len(checks), "checks": checks}

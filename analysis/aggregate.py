@@ -25,6 +25,27 @@ def group_by(runs: list[GradedRun], *keys: str) -> dict[tuple[str, ...], list[Gr
     return groups
 
 
+def check_pass_rates(group: list[GradedRun]) -> dict[str, dict[str, Any]]:
+    """Per-check pass rate within one group. The checks are pass/fail specs,
+    so a rate here is the share of seeds that met that spec -- two models can
+    reach the same overall score by failing entirely different checks, and
+    this is what tells them apart."""
+    names: list[str] = []
+    for r in group:
+        for name in r.check_scores:
+            if name not in names:
+                names.append(name)
+    out: dict[str, dict[str, Any]] = {}
+    for name in names:
+        vals = [r.check_scores[name] for r in group if name in r.check_scores]
+        out[name] = {
+            "pass_rate": (sum(vals) / len(vals)) if vals else float("nan"),
+            "n_passed": int(sum(vals)),
+            "n": len(vals),
+        }
+    return out
+
+
 def scores_by_model_framework_feedback(runs: list[GradedRun]) -> list[dict[str, Any]]:
     rows = []
     for (model, framework, feedback_mode), group in sorted(group_by(runs, "model", "framework", "feedback_mode").items()):
@@ -37,6 +58,7 @@ def scores_by_model_framework_feedback(runs: list[GradedRun]) -> list[dict[str, 
             "mean_score": mean,
             "ci95_lo": lo,
             "ci95_hi": hi,
+            "checks": check_pass_rates(group),
         })
     return rows
 

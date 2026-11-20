@@ -40,6 +40,14 @@ class GradedRun:
         return float(self.score["score"])
 
     @property
+    def check_scores(self) -> dict[str, float]:
+        """Each check's own 0/1 outcome, keyed by check name. The checks are
+        pass/fail specs, so averaging these across seeds gives a pass rate --
+        which check a model misses, and how often, is the part the single
+        overall score cannot show."""
+        return {k: float(v["score"]) for k, v in self.score.get("checks", {}).items()}
+
+    @property
     def ease_mix(self) -> dict[str, int]:
         """Counts of easeSource across every keyframe in every property,
         for the preset-vs-hand-placed breakdown."""
