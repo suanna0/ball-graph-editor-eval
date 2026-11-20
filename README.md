@@ -67,11 +67,6 @@ First multi-model batch: 4 models x 5 seeds on CSS / rubber ball / full
 feedback, via OpenRouter, 2026-11-20. 20/20 rollouts completed, none
 truncated.
 
-Re-scored under the current 10-check rubric. The rollouts themselves are
-unchanged -- `grade.py` re-extracts from each run's frozen `final/`
-snapshot, so the rubric can be revised and the same corpus re-scored with
-no model calls.
-
 | Model | Score | Per-seed | CI95 | Cost |
 |-------|-------|----------|------|------|
 | `anthropic/claude-opus-5.5` | **5.2/10** | 6,5,5,5,5 | 5.0–5.6 | $1.75 |
@@ -94,25 +89,17 @@ Per-check pass rate (of 5 seeds):
 | 9 `bounce_timing` | **0/5** | **0/5** | **0/5** | **0/5** |
 | 10 `contact_handles_nontrivial` | 5/5 | 5/5 | **2/5** | **3/5** |
 
-Three checks pass universally and four fail universally, so most of the
-separation between models comes from just two checks: 3 and 10. Check 10 is
-the strongest discriminator -- it varies both between models and between
-seeds of the same model, catching contacts whose easing leaves no tangent
-control there at all (CSS `ease-in`'s second control point sits at `(1,1)`
-and `ease-out`'s first at `(0,0)`, both collapsing onto the endpoint they
-attach to, so a very natural easing choice yields zero-length handles
-exactly at the contacts).
+Three checks pass universally and four fail universally and most of the
+separation between models comes from checks 3 and 10. 
 
-**Checks 4 and 6 are not currently reachable.** Both concern the x channel,
-and the CSS brief directs workers to a single `@keyframes` rule driven by
-`transform` -- inside one such rule every stop sets the whole transform
-value, so x takes a key wherever y does and inherits y's per-segment
-easing. Extracted x and y key counts are identical in all 20 runs: (48,48),
-(19,19), (13,13). Meanwhile `grader/fixtures/perfect/` has x:2 / y:14, so
-the rubric grades against a shape the brief forbids, and check 8 is largely
-downstream of the same cause (x's final key lands at the animation's end
-rather than at the last contact). Fixing this is a task-design change, not
-a rubric one.
+All of the models' work had the same number of X keys and Y keys, 
+breaking the rule that for all channels, the number of keys should stay 
+relatively minimal. This makes human collaboration difficult because if 
+a human wanted to modify the end-position of the ball's bounce but keep 
+the overall travel shape, with respect to time, the same, instead of 
+moving one keyframe, they would not only have to move about triple, or more if 
+rule 5 is broken, the number of bounces' worth of keyframes, but also fit them 
+to their desired shape by hand. 
 
 ## Repo layout
 
