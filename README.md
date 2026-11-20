@@ -78,16 +78,16 @@ Per-check pass rate (of 5 seeds):
 
 | Check | opus-5.5 | gpt-6-sol | gpt-6-luna | gemini-4-h |
 |-------|----------|-----------|------------|------------|
-| 1 `min_bounces` | 5/5 | 5/5 | 5/5 | 5/5 |
-| 2 `contact_convex_hull` | 5/5 | 5/5 | 5/5 | 5/5 |
-| 3 `corner_at_contact_flat_apex` | 5/5 | 5/5 | 5/5 | **2/5** |
-| 4 `x_shape` | **0/5** | **0/5** | **0/5** | **0/5** |
-| 5 `y_key_count` | **0/5** | **0/5** | **0/5** | **0/5** |
-| 6 `x_key_count` | **0/5** | **0/5** | **0/5** | **0/5** |
-| 7 `no_stray_keys` | 5/5 | 5/5 | 5/5 | 5/5 |
-| 8 `final_x_key` | 1/5 | **0/5** | **0/5** | **0/5** |
-| 9 `bounce_timing` | **0/5** | **0/5** | **0/5** | **0/5** |
-| 10 `contact_handles_nontrivial` | 5/5 | 5/5 | **2/5** | **3/5** |
+| `min_bounces` | 5/5 | 5/5 | 5/5 | 5/5 |
+| `contact_convex_hull` | 5/5 | 5/5 | 5/5 | 5/5 |
+| `corner_at_contact_flat_apex` | 5/5 | 5/5 | 5/5 | **2/5** |
+| `x_shape` | **0/5** | **0/5** | **0/5** | **0/5** |
+| `y_key_count` | **0/5** | **0/5** | **0/5** | **0/5** |
+| `x_key_count` | **0/5** | **0/5** | **0/5** | **0/5** |
+| `no_stray_keys` | 5/5 | 5/5 | 5/5 | 5/5 |
+| `final_x_key` | 1/5 | **0/5** | **0/5** | **0/5** |
+| `bounce_timing` | **0/5** | **0/5** | **0/5** | **0/5** |
+| `contact_handles_nontrivial` | 5/5 | 5/5 | **2/5** | **3/5** |
 
 Three checks pass universally and four fail universally and most of the
 separation between models comes from checks 3 and 10. 
