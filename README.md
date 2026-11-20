@@ -70,33 +70,52 @@ First multi-model batch: 4 models x 5 seeds on CSS / rubber ball / full
 feedback, via OpenRouter, 2026-11-20. 20/20 rollouts completed, none
 truncated.
 
-Scored under the **previous 7-check rubric**, before checks 1, 6 and 8 were
-added -- the `score.json` files still hold those results, so re-running
-`make grade` over this batch would replace them with N/9 and these numbers
-would no longer reproduce.
+Re-scored under the current 10-check rubric. The rollouts themselves are
+unchanged -- `grade.py` re-extracts from each run's frozen `final/`
+snapshot, so the rubric can be revised and the same corpus re-scored with
+no model calls.
 
-| Model | Score | Per-seed | SD | Cost |
-|-------|-------|----------|-----|------|
-| `anthropic/claude-opus-5.5` | **4/7** | 4,4,4,4,4 | 0.00 | $1.75 |
-| `openai/gpt-6-sol` | **4/7** | 4,4,4,4,4 | 0.00 | $0.41 |
-| `openai/gpt-6-luna` | **4/7** | 4,4,4,4,4 | 0.00 | $0.02 |
-| `google/gemini-4-hydrogen` | 3.4/7 | 3,3,3,4,4 | 0.55 | $5.24 |
+| Model | Score | Per-seed | CI95 | Cost |
+|-------|-------|----------|------|------|
+| `anthropic/claude-opus-5.5` | **5.2/10** | 6,5,5,5,5 | 5.0–5.6 | $1.75 |
+| `openai/gpt-6-sol` | **5.0/10** | 5,5,5,5,5 | 5.0–5.0 | $0.41 |
+| `openai/gpt-6-luna` | 4.4/10 | 5,5,4,4,4 | 4.0–4.8 | $0.02 |
+| `google/gemini-4-hydrogen` | 4.0/10 | 5,5,4,3,3 | 3.2–4.8 | $5.24 |
 
 Per-check pass rate (of 5 seeds):
 
 | Check | opus-5.5 | gpt-6-sol | gpt-6-luna | gemini-4-h |
 |-------|----------|-----------|------------|------------|
-| 1 `contact_convex_hull` | 5/5 | 5/5 | 5/5 | 5/5 |
-| 2 `corner_at_contact_flat_apex` | 5/5 | 5/5 | 5/5 | **2/5** |
-| 3 `x_shape` | **0/5** | **0/5** | **0/5** | **0/5** |
-| 4 `y_key_count` | **0/5** | **0/5** | **0/5** | **0/5** |
-| 5 `no_stray_keys` | 5/5 | 5/5 | 5/5 | 5/5 |
-| 6 `settle_together` | 5/5 | 5/5 | 5/5 | 5/5 |
-| 7 `bounce_timing` | **0/5** | **0/5** | **0/5** | **0/5** |
+| 1 `min_bounces` | 5/5 | 5/5 | 5/5 | 5/5 |
+| 2 `contact_convex_hull` | 5/5 | 5/5 | 5/5 | 5/5 |
+| 3 `corner_at_contact_flat_apex` | 5/5 | 5/5 | 5/5 | **2/5** |
+| 4 `x_shape` | **0/5** | **0/5** | **0/5** | **0/5** |
+| 5 `y_key_count` | **0/5** | **0/5** | **0/5** | **0/5** |
+| 6 `x_key_count` | **0/5** | **0/5** | **0/5** | **0/5** |
+| 7 `no_stray_keys` | 5/5 | 5/5 | 5/5 | 5/5 |
+| 8 `final_x_key` | 1/5 | **0/5** | **0/5** | **0/5** |
+| 9 `bounce_timing` | **0/5** | **0/5** | **0/5** | **0/5** |
+| 10 `contact_handles_nontrivial` | 5/5 | 5/5 | **2/5** | **3/5** |
 
-**The eval does not currently discriminate between frontier models.** Four
-checks always pass and three always fail, so three different models get the same
-score on every run. 
+Three checks pass universally and four fail universally, so most of the
+separation between models comes from just two checks: 3 and 10. Check 10 is
+the strongest discriminator -- it varies both between models and between
+seeds of the same model, catching contacts whose easing leaves no tangent
+control there at all (CSS `ease-in`'s second control point sits at `(1,1)`
+and `ease-out`'s first at `(0,0)`, both collapsing onto the endpoint they
+attach to, so a very natural easing choice yields zero-length handles
+exactly at the contacts).
+
+**Checks 4 and 6 are not currently reachable.** Both concern the x channel,
+and the CSS brief directs workers to a single `@keyframes` rule driven by
+`transform` -- inside one such rule every stop sets the whole transform
+value, so x takes a key wherever y does and inherits y's per-segment
+easing. Extracted x and y key counts are identical in all 20 runs: (48,48),
+(19,19), (13,13). Meanwhile `grader/fixtures/perfect/` has x:2 / y:14, so
+the rubric grades against a shape the brief forbids, and check 8 is largely
+downstream of the same cause (x's final key lands at the animation's end
+rather than at the last contact). Fixing this is a task-design change, not
+a rubric one.
 
 ## Repo layout
 
